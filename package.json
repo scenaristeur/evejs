@@ -26,12 +26,26 @@
     "ws": "^6.1.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.1.2",
+    "babel-loader": "^8.0.4",
+    "babelify": "^10.0.0",
+    "browserify": "^16.2.3",
     "freeport": "1.0.5",
     "gulp": "^4.0.0",
+    "gulp-babel": "^8.0.0",
+    "gulp-clean": "^0.4.0",
+    "gulp-inline-sourcemap": "^0.1.1",
+    "gulp-livereload": "^4.0.0",
+    "gulp-rename": "^1.4.0",
+    "gulp-sourcemaps": "^2.6.4",
+    "gulp-uglify": "^3.0.1",
     "gulp-util": "3.0.7",
     "mocha": "^5.2.0",
     "uglify-js": "2.6.1",
-    "webpack": "1.12.13"
+    "vinyl-buffer": "^1.0.1",
+    "vinyl-source-stream": "^2.0.0",
+    "webpack": "1.12.13",
+    "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
     "build": "gulp build",

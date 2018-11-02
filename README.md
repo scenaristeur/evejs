@@ -1,3 +1,10 @@
+# revoir gulp4
+
+https://github.com/ampproject/docs/issues/793
+
+https://codeburst.io/switching-to-gulp-4-0-271ae63530c0
+
+
 # evejs
 
 Eve is a multipurpose, web-based agent platform. Eve envisions to be an open and dynamic environment where agents can live and act anywhere: in the cloud, on smartphones, on desktops, in browsers, robots, home automation devices, and others. The agents communicate with each other using simple, existing protocols (JSON-RPC) over existing transport layers (HTTP, AMQP, WebSockets, etc.), offering a language and platform agnostic solution.
@@ -51,7 +58,7 @@ Load `evejs` in the browser:
 
 An agent basically has a methods `send`, `receive`, `connect` and `disconnect`.
 An agent can be extended with modules like `pattern` and `request`. There is
-a central configuration `eve.system` which can be used to load transports. 
+a central configuration `eve.system` which can be used to load transports.
 The loaded transports can be used by agents to communicate with each other.
 
 To set up a system with eve agents:
@@ -60,40 +67,40 @@ To set up a system with eve agents:
 
   ```js
   var eve = require('evejs');
-  
+
   function MyAgent(id) {
     // execute super constructor
     eve.Agent.call(this, id);
-    
-    // extend the agent with modules (choose from 
+
+    // extend the agent with modules (choose from
     // 'babble', 'pattern', 'request', and 'rpc')
     this.extend('request');
-    
+
     // connect to some or all transports
     this.connect(eve.system.transports.getAll());
   }
-  
+
   // extend the eve.Agent prototype
   MyAgent.prototype = Object.create(eve.Agent.prototype);
   MyAgent.prototype.constructor = MyAgent;
-  
+
   MyAgent.prototype.receive = function (from, message) {
     // handle incoming messages...
   };
-  
+
   module.exports = MyAgent;
   ```
 
-- To send and receive messages, each agent has a method `send(to, message)` and 
-`receive(from, message)`. A message can be send to and agent by specifying either 
-the agents full url, or just the agents id. In the latter case, the agent will 
+- To send and receive messages, each agent has a method `send(to, message)` and
+`receive(from, message)`. A message can be send to and agent by specifying either
+the agents full url, or just the agents id. In the latter case, the agent will
 send the message via the transport marked as *default*.
 
   ```js
   agent1.send('distribus://networkId/agent2', 'hello agent2!');
   agent1.send('agent2', 'hello agent2!'); // send via the default transport
   ```
-  
+
   The *networkId* of a transport can be found at `transport.networkId`.
 
 - Configure `eve.system`, initialize transports and other services.
@@ -116,7 +123,7 @@ send the message via the transport marked as *default*.
 
 ### HelloAgent
 
-To create a simple agent class, create a file [**HelloAgent.js**](examples/agents/HelloAgent.js) with the 
+To create a simple agent class, create a file [**HelloAgent.js**](examples/agents/HelloAgent.js) with the
 following code:
 
 ```js
@@ -150,7 +157,7 @@ HelloAgent.prototype.receive = function(from, message) {
 module.exports = HelloAgent;
 ```
 
-This agent class can be used as follows. Note that the agents talk to each 
+This agent class can be used as follows. Note that the agents talk to each
 other via a `LocalTransport` which is instantiated in `eve.system` by default.
 
 ```js
