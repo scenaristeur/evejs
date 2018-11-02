@@ -1,6 +1,6 @@
 {
   "name": "evejs",
-  "version": "0.5.0",
+  "version": "0.6.0-SNAPSHOT",
   "description": "Simple message based agents.",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "keywords": [
@@ -14,7 +14,7 @@
     "url": "git://github.com/enmasseio/evejs.git"
   },
   "dependencies": {
-    "amqplib": "0.4.1",
+    "amqplib": "0.5.1",
     "async": "1.5.2",
     "babble": "0.11.0",
     "distribus": "github:scenaristeur/distribus#develop",
@@ -34,9 +34,11 @@
     "webpack": "1.12.13"
   },
   "scripts": {
-    "build": "gulp",
-    "watch": "gulp watch",
-    "watch-dev": "gulp watch-dev",
+    "build": "gulp build",
+    "babel": "gulp babel",
+    "compress": "gulp compress",
+    "watch": "gulp watch-bundle",
+    "watch-compress": "gulp watch",
     "test": "mocha test --recursive --reporter spec"
   },
   "main": "./index.js"
