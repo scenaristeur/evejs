@@ -1,6 +1,6 @@
 {
   "name": "evejs",
-  "version": "0.5.0",
+  "version": "0.6.0-SNAPSHOT",
   "description": "Simple message based agents.",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "keywords": [
@@ -14,11 +14,11 @@
     "url": "git://github.com/enmasseio/evejs.git"
   },
   "dependencies": {
-    "amqplib": "0.4.1",
+    "amqplib": "0.5.1",
     "async": "1.5.2",
     "babble": "0.11.0",
-    "distribus": "github:scenaristeur/distribus",
-    "hypertimer": "github:scenaristeur/hypertimer",
+    "distribus": "github:scenaristeur/distribus#develop",
+    "hypertimer": "github:scenaristeur/hypertimer#develop",
     "promise": "7.1.1",
     "pubnub": "3.9.2",
     "seed-random": "2.2.0",
@@ -26,17 +26,33 @@
     "ws": "^6.1.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.1.2",
+    "babel-loader": "^8.0.4",
+    "babelify": "^10.0.0",
+    "browserify": "^16.2.3",
     "freeport": "1.0.5",
     "gulp": "^4.0.0",
+    "gulp-babel": "^8.0.0",
+    "gulp-clean": "^0.4.0",
+    "gulp-inline-sourcemap": "^0.1.1",
+    "gulp-livereload": "^4.0.0",
+    "gulp-rename": "^1.4.0",
+    "gulp-sourcemaps": "^2.6.4",
+    "gulp-uglify": "^3.0.1",
     "gulp-util": "3.0.7",
     "mocha": "^5.2.0",
     "uglify-js": "2.6.1",
-    "webpack": "1.12.13"
+    "vinyl-buffer": "^1.0.1",
+    "vinyl-source-stream": "^2.0.0",
+    "webpack": "1.12.13",
+    "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
-    "build": "gulp",
-    "watch": "gulp watch",
-    "watch-dev": "gulp watch-dev",
+    "build": "gulp build",
+    "babel": "gulp babel",
+    "compress": "gulp compress",
+    "watch": "gulp watch-bundle",
+    "watch-compress": "gulp watch",
     "test": "mocha test --recursive --reporter spec"
   },
   "main": "./index.js"
