@@ -48,10 +48,11 @@
     "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
-    "build": "gulp build",
+    "build": "gulp",
+    "watch": "gulp watch",
+    "watch-dev": "gulp watch-dev",
     "babel": "gulp babel",
     "compress": "gulp compress",
-    "watch": "gulp watch-bundle",
     "watch-compress": "gulp watch",
     "test": "mocha test --recursive --reporter spec"
   },
