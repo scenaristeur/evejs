@@ -1,8 +1,8 @@
-# revoir gulp4
-
-https://github.com/ampproject/docs/issues/793
-
-https://codeburst.io/switching-to-gulp-4-0-271ae63530c0
+# Build a minimal browser version in dist/eve.custom.js
+```
+npm install -g browserify
+browserify custom.js -o dist/eve.custom.js -s eve
+```
 
 
 # evejs
