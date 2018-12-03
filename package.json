@@ -3,15 +3,9 @@
   "version": "0.6.0-SNAPSHOT",
   "description": "Simple message based agents.",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
-<<<<<<< HEAD
   "scripts": {
    "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve"
 },
-=======
-   "scripts": {
-    "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve"
-  },
->>>>>>> 829379bf0ce8bf1074ae12ce3cd883daaef03ef6
   "keywords": [
     "eve",
     "agent",
