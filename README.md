@@ -5,6 +5,7 @@ browserify custom.js -o dist/eve.custom.js -s eve
 ```
 
 
+
 # evejs
 
 Eve is a multipurpose, web-based agent platform. Eve envisions to be an open and dynamic environment where agents can live and act anywhere: in the cloud, on smartphones, on desktops, in browsers, robots, home automation devices, and others. The agents communicate with each other using simple, existing protocols (JSON-RPC) over existing transport layers (HTTP, AMQP, WebSockets, etc.), offering a language and platform agnostic solution.
@@ -25,8 +26,10 @@ The `evejs` library features:
 ## Install
 
 Install the module via npm:
+```
 
     npm install evejs
+```
 
 ## Load
 
