@@ -3,9 +3,6 @@
   "version": "0.6.0-SNAPSHOT",
   "description": "Simple message based agents.",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
-  "scripts": {
-   "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve"
-},
   "keywords": [
     "eve",
     "agent",
@@ -51,6 +48,7 @@
     "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
+     "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve",
     "build": "gulp",
     "watch": "gulp watch",
     "watch-dev": "gulp watch-dev",
