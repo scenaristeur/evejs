@@ -4,6 +4,12 @@ npm install -g browserify
 browserify custom.js -o dist/eve.custom.js -s eve
 ```
 
+# With Rquest Module
+```
+npm install -g browserify
+browserify custom-request.js -o dist/eve.custom-request.js -s eve
+```
+
 
 
 # evejs
