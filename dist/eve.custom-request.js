@@ -2215,7 +2215,7 @@ ServiceManager.prototype.clear = function () {
 
 module.exports = ServiceManager;
 
-},{"./TransportManager":11,"hypertimer":39,"seed-random":68}],11:[function(require,module,exports){
+},{"./TransportManager":11,"hypertimer":36,"seed-random":68}],11:[function(require,module,exports){
 'use strict';
 
 /**
@@ -3034,9 +3034,7 @@ module.exports = function () {};
 },{}],21:[function(require,module,exports){
 "use strict";
 
-module.exports = require("./is-implemented")()
-	? Object.assign
-	: require("./shim");
+module.exports = require("./is-implemented")() ? Object.assign : require("./shim");
 
 },{"./is-implemented":22,"./shim":23}],22:[function(require,module,exports){
 "use strict";
@@ -3046,7 +3044,7 @@ module.exports = function () {
 	if (typeof assign !== "function") return false;
 	obj = { foo: "raz" };
 	assign(obj, { bar: "dwa" }, { trzy: "trzy" });
-	return (obj.foo + obj.bar + obj.trzy) === "razdwatrzy";
+	return obj.foo + obj.bar + obj.trzy === "razdwatrzy";
 };
 
 },{}],23:[function(require,module,exports){
@@ -3056,7 +3054,7 @@ var keys  = require("../keys")
   , value = require("../valid-value")
   , max   = Math.max;
 
-module.exports = function (dest, src /*, …srcn*/) {
+module.exports = function (dest, src/*, …srcn*/) {
 	var error, i, length = max(arguments.length, 2), assign;
 	dest = Object(value(dest));
 	assign = function (key) {
@@ -3079,9 +3077,7 @@ module.exports = function (dest, src /*, …srcn*/) {
 
 "use strict";
 
-module.exports = function (obj) {
- return typeof obj === "function";
-};
+module.exports = function (obj) { return typeof obj === "function"; };
 
 },{}],25:[function(require,module,exports){
 "use strict";
@@ -3104,9 +3100,7 @@ module.exports = function (obj) {
 
 var _undefined = require("../function/noop")(); // Support ES3 engines
 
-module.exports = function (val) {
- return (val !== _undefined) && (val !== null);
-};
+module.exports = function (val) { return val !== _undefined && val !== null; };
 
 },{"../function/noop":20}],27:[function(require,module,exports){
 "use strict";
@@ -3147,7 +3141,7 @@ var process = function (src, obj) {
 };
 
 // eslint-disable-next-line no-unused-vars
-module.exports = function (opts1 /*, …options*/) {
+module.exports = function (opts1/*, …options*/) {
 	var result = create(null);
 	forEach.call(arguments, function (options) {
 		if (!isValue(options)) return;
@@ -3177,9 +3171,7 @@ module.exports = function (value) {
 },{"./is-value":26}],33:[function(require,module,exports){
 "use strict";
 
-module.exports = require("./is-implemented")()
-	? String.prototype.contains
-	: require("./shim");
+module.exports = require("./is-implemented")() ? String.prototype.contains : require("./shim");
 
 },{"./is-implemented":34,"./shim":35}],34:[function(require,module,exports){
 "use strict";
@@ -3188,7 +3180,7 @@ var str = "razdwatrzy";
 
 module.exports = function () {
 	if (typeof str.contains !== "function") return false;
-	return (str.contains("dwa") === true) && (str.contains("foo") === false);
+	return str.contains("dwa") === true && str.contains("foo") === false;
 };
 
 },{}],35:[function(require,module,exports){
@@ -3201,231 +3193,14 @@ module.exports = function (searchString/*, position*/) {
 };
 
 },{}],36:[function(require,module,exports){
-'use strict';
-
-var isEmpty = require('es5-ext/object/is-empty')
-  , value   = require('es5-ext/object/valid-value')
-
-  , hasOwnProperty = Object.prototype.hasOwnProperty;
-
-module.exports = function (obj/*, type*/) {
-	var type;
-	value(obj);
-	type = arguments[1];
-	if (arguments.length > 1) {
-		return hasOwnProperty.call(obj, '__ee__') && Boolean(obj.__ee__[type]);
-	}
-	return obj.hasOwnProperty('__ee__') && !isEmpty(obj.__ee__);
-};
-
-},{"es5-ext/object/is-empty":25,"es5-ext/object/valid-value":32}],37:[function(require,module,exports){
-'use strict';
-
-var d        = require('d')
-  , callable = require('es5-ext/object/valid-callable')
-
-  , apply = Function.prototype.apply, call = Function.prototype.call
-  , create = Object.create, defineProperty = Object.defineProperty
-  , defineProperties = Object.defineProperties
-  , hasOwnProperty = Object.prototype.hasOwnProperty
-  , descriptor = { configurable: true, enumerable: false, writable: true }
-
-  , on, once, off, emit, methods, descriptors, base;
-
-on = function (type, listener) {
-	var data;
-
-	callable(listener);
-
-	if (!hasOwnProperty.call(this, '__ee__')) {
-		data = descriptor.value = create(null);
-		defineProperty(this, '__ee__', descriptor);
-		descriptor.value = null;
-	} else {
-		data = this.__ee__;
-	}
-	if (!data[type]) data[type] = listener;
-	else if (typeof data[type] === 'object') data[type].push(listener);
-	else data[type] = [data[type], listener];
-
-	return this;
-};
-
-once = function (type, listener) {
-	var once, self;
-
-	callable(listener);
-	self = this;
-	on.call(this, type, once = function () {
-		off.call(self, type, once);
-		apply.call(listener, this, arguments);
-	});
-
-	once.__eeOnceListener__ = listener;
-	return this;
-};
-
-off = function (type, listener) {
-	var data, listeners, candidate, i;
-
-	callable(listener);
-
-	if (!hasOwnProperty.call(this, '__ee__')) return this;
-	data = this.__ee__;
-	if (!data[type]) return this;
-	listeners = data[type];
-
-	if (typeof listeners === 'object') {
-		for (i = 0; (candidate = listeners[i]); ++i) {
-			if ((candidate === listener) ||
-					(candidate.__eeOnceListener__ === listener)) {
-				if (listeners.length === 2) data[type] = listeners[i ? 0 : 1];
-				else listeners.splice(i, 1);
-			}
-		}
-	} else {
-		if ((listeners === listener) ||
-				(listeners.__eeOnceListener__ === listener)) {
-			delete data[type];
-		}
-	}
-
-	return this;
-};
-
-emit = function (type) {
-	var i, l, listener, listeners, args;
-
-	if (!hasOwnProperty.call(this, '__ee__')) return;
-	listeners = this.__ee__[type];
-	if (!listeners) return;
-
-	if (typeof listeners === 'object') {
-		l = arguments.length;
-		args = new Array(l - 1);
-		for (i = 1; i < l; ++i) args[i - 1] = arguments[i];
-
-		listeners = listeners.slice();
-		for (i = 0; (listener = listeners[i]); ++i) {
-			apply.call(listener, this, args);
-		}
-	} else {
-		switch (arguments.length) {
-		case 1:
-			call.call(listeners, this);
-			break;
-		case 2:
-			call.call(listeners, this, arguments[1]);
-			break;
-		case 3:
-			call.call(listeners, this, arguments[1], arguments[2]);
-			break;
-		default:
-			l = arguments.length;
-			args = new Array(l - 1);
-			for (i = 1; i < l; ++i) {
-				args[i - 1] = arguments[i];
-			}
-			apply.call(listeners, this, args);
-		}
-	}
-};
-
-methods = {
-	on: on,
-	once: once,
-	off: off,
-	emit: emit
-};
-
-descriptors = {
-	on: d(on),
-	once: d(once),
-	off: d(off),
-	emit: d(emit)
-};
-
-base = defineProperties({}, descriptors);
-
-module.exports = exports = function (o) {
-	return (o == null) ? create(base) : defineProperties(Object(o), descriptors);
-};
-exports.methods = methods;
-
-},{"d":38,"es5-ext/object/valid-callable":31}],38:[function(require,module,exports){
-'use strict';
-
-var assign        = require('es5-ext/object/assign')
-  , normalizeOpts = require('es5-ext/object/normalize-options')
-  , isCallable    = require('es5-ext/object/is-callable')
-  , contains      = require('es5-ext/string/#/contains')
-
-  , d;
-
-d = module.exports = function (dscr, value/*, options*/) {
-	var c, e, w, options, desc;
-	if ((arguments.length < 2) || (typeof dscr !== 'string')) {
-		options = value;
-		value = dscr;
-		dscr = null;
-	} else {
-		options = arguments[2];
-	}
-	if (dscr == null) {
-		c = w = true;
-		e = false;
-	} else {
-		c = contains.call(dscr, 'c');
-		e = contains.call(dscr, 'e');
-		w = contains.call(dscr, 'w');
-	}
-
-	desc = { value: value, configurable: c, enumerable: e, writable: w };
-	return !options ? desc : assign(normalizeOpts(options), desc);
-};
-
-d.gs = function (dscr, get, set/*, options*/) {
-	var c, e, options, desc;
-	if (typeof dscr !== 'string') {
-		options = set;
-		set = get;
-		get = dscr;
-		dscr = null;
-	} else {
-		options = arguments[3];
-	}
-	if (get == null) {
-		get = undefined;
-	} else if (!isCallable(get)) {
-		options = get;
-		get = set = undefined;
-	} else if (set == null) {
-		set = undefined;
-	} else if (!isCallable(set)) {
-		options = set;
-		set = undefined;
-	}
-	if (dscr == null) {
-		c = true;
-		e = false;
-	} else {
-		c = contains.call(dscr, 'c');
-		e = contains.call(dscr, 'e');
-	}
-
-	desc = { get: get, set: set, configurable: c, enumerable: e };
-	return !options ? desc : assign(normalizeOpts(options), desc);
-};
-
-},{"es5-ext/object/assign":21,"es5-ext/object/is-callable":24,"es5-ext/object/normalize-options":30,"es5-ext/string/#/contains":33}],39:[function(require,module,exports){
 module.exports = require('./lib/hypertimer');
 
-},{"./lib/hypertimer":42}],40:[function(require,module,exports){
+},{"./lib/hypertimer":39}],37:[function(require,module,exports){
 module.exports = (typeof window === 'undefined' || typeof window.Promise === 'undefined') ?
     require('promise') :
     window.Promise;
 
-},{"promise":53}],41:[function(require,module,exports){
+},{"promise":53}],38:[function(require,module,exports){
 var Debug = typeof window !== 'undefined' ? window.Debug : require('debug');
 
 module.exports = Debug || function () {
@@ -3433,7 +3208,7 @@ module.exports = Debug || function () {
   return function () {};
 };
 
-},{"debug":50}],42:[function(require,module,exports){
+},{"debug":48}],39:[function(require,module,exports){
 var emitter = require('event-emitter');
 var hasListeners = require('event-emitter/has-listeners');
 var createMaster = require('./synchronization/master').createMaster;
@@ -4136,12 +3911,12 @@ function hypertimer(options) {
 
 module.exports = hypertimer;
 
-},{"./synchronization/master":44,"./synchronization/slave":45,"./util":49,"event-emitter":37,"event-emitter/has-listeners":36}],43:[function(require,module,exports){
+},{"./synchronization/master":41,"./synchronization/slave":42,"./util":46,"event-emitter":51,"event-emitter/has-listeners":50}],40:[function(require,module,exports){
 module.exports = (typeof window === 'undefined' || typeof window.WebSocket === 'undefined') ?
     require('ws') :
     window.WebSocket;
 
-},{"ws":70}],44:[function(require,module,exports){
+},{"ws":70}],41:[function(require,module,exports){
 var WebSocket = require('./WebSocket');
 var emitter = require('./socket-emitter');
 var debug = require('../debug')('hypertimer:master');
@@ -4198,7 +3973,7 @@ exports.createMaster = function (now, config, port) {
   return master;
 };
 
-},{"../debug":41,"./WebSocket":43,"./socket-emitter":46}],45:[function(require,module,exports){
+},{"../debug":38,"./WebSocket":40,"./socket-emitter":43}],42:[function(require,module,exports){
 var WebSocket = require('./WebSocket');
 var Promise = require('../Promise');
 var debug = require('../debug')('hypertimer:slave');
@@ -4323,7 +4098,7 @@ exports.createSlave = function (url) {
 };
 
 
-},{"../Promise":40,"../debug":41,"./WebSocket":43,"./socket-emitter":46,"./stat":47,"./util":48}],46:[function(require,module,exports){
+},{"../Promise":37,"../debug":38,"./WebSocket":40,"./socket-emitter":43,"./stat":44,"./util":45}],43:[function(require,module,exports){
 // Turn a WebSocket in an event emitter.
 var eventEmitter = require('event-emitter');
 var Promise = require('./../Promise');
@@ -4435,7 +4210,7 @@ module.exports = function (socket) {
   return emitter;
 };
 
-},{"../debug":41,"./../Promise":40,"event-emitter":37}],47:[function(require,module,exports){
+},{"../debug":38,"./../Promise":37,"event-emitter":51}],44:[function(require,module,exports){
 // basic statistical functions
 
 exports.compare = function (a, b) {
@@ -4483,7 +4258,7 @@ exports.median = function (arr) {
   }
 };
 
-},{}],48:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 var Promise = require('../Promise');
 
 /**
@@ -4548,7 +4323,7 @@ exports.whilst = function (condition, callback) {
   });
 };
 
-},{"../Promise":40}],49:[function(require,module,exports){
+},{"../Promise":37}],46:[function(require,module,exports){
 
 /* istanbul ignore else */
 if (typeof Date.now === 'function') {
@@ -4584,7 +4359,72 @@ exports.shuffle = function (o){
   return o;
 };
 
-},{}],50:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
+'use strict';
+
+var assign        = require('es5-ext/object/assign')
+  , normalizeOpts = require('es5-ext/object/normalize-options')
+  , isCallable    = require('es5-ext/object/is-callable')
+  , contains      = require('es5-ext/string/#/contains')
+
+  , d;
+
+d = module.exports = function (dscr, value/*, options*/) {
+	var c, e, w, options, desc;
+	if ((arguments.length < 2) || (typeof dscr !== 'string')) {
+		options = value;
+		value = dscr;
+		dscr = null;
+	} else {
+		options = arguments[2];
+	}
+	if (dscr == null) {
+		c = w = true;
+		e = false;
+	} else {
+		c = contains.call(dscr, 'c');
+		e = contains.call(dscr, 'e');
+		w = contains.call(dscr, 'w');
+	}
+
+	desc = { value: value, configurable: c, enumerable: e, writable: w };
+	return !options ? desc : assign(normalizeOpts(options), desc);
+};
+
+d.gs = function (dscr, get, set/*, options*/) {
+	var c, e, options, desc;
+	if (typeof dscr !== 'string') {
+		options = set;
+		set = get;
+		get = dscr;
+		dscr = null;
+	} else {
+		options = arguments[3];
+	}
+	if (get == null) {
+		get = undefined;
+	} else if (!isCallable(get)) {
+		options = get;
+		get = set = undefined;
+	} else if (set == null) {
+		set = undefined;
+	} else if (!isCallable(set)) {
+		options = set;
+		set = undefined;
+	}
+	if (dscr == null) {
+		c = true;
+		e = false;
+	} else {
+		c = contains.call(dscr, 'c');
+		e = contains.call(dscr, 'e');
+	}
+
+	desc = { get: get, set: set, configurable: c, enumerable: e };
+	return !options ? desc : assign(normalizeOpts(options), desc);
+};
+
+},{"es5-ext/object/assign":21,"es5-ext/object/is-callable":24,"es5-ext/object/normalize-options":30,"es5-ext/string/#/contains":33}],48:[function(require,module,exports){
 (function (process){
 /* eslint-env browser */
 
@@ -4852,7 +4692,7 @@ formatters.j = function (v) {
 };
 
 }).call(this,require('_process'))
-},{"./common":51,"_process":1}],51:[function(require,module,exports){
+},{"./common":49,"_process":1}],49:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -4998,7 +4838,9 @@ function setup(env) {
 	}
 
 	function extend(namespace, delimiter) {
-		return createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
+		const newDebug = createDebug(this.namespace + (typeof delimiter === 'undefined' ? ':' : delimiter) + namespace);
+		newDebug.log = this.log;
+		return newDebug;
 	}
 
 	/**
@@ -5118,7 +4960,159 @@ function setup(env) {
 
 module.exports = setup;
 
-},{"ms":52}],52:[function(require,module,exports){
+},{"ms":52}],50:[function(require,module,exports){
+'use strict';
+
+var isEmpty = require('es5-ext/object/is-empty')
+  , value   = require('es5-ext/object/valid-value')
+
+  , hasOwnProperty = Object.prototype.hasOwnProperty;
+
+module.exports = function (obj/*, type*/) {
+	var type;
+	value(obj);
+	type = arguments[1];
+	if (arguments.length > 1) {
+		return hasOwnProperty.call(obj, '__ee__') && Boolean(obj.__ee__[type]);
+	}
+	return obj.hasOwnProperty('__ee__') && !isEmpty(obj.__ee__);
+};
+
+},{"es5-ext/object/is-empty":25,"es5-ext/object/valid-value":32}],51:[function(require,module,exports){
+'use strict';
+
+var d        = require('d')
+  , callable = require('es5-ext/object/valid-callable')
+
+  , apply = Function.prototype.apply, call = Function.prototype.call
+  , create = Object.create, defineProperty = Object.defineProperty
+  , defineProperties = Object.defineProperties
+  , hasOwnProperty = Object.prototype.hasOwnProperty
+  , descriptor = { configurable: true, enumerable: false, writable: true }
+
+  , on, once, off, emit, methods, descriptors, base;
+
+on = function (type, listener) {
+	var data;
+
+	callable(listener);
+
+	if (!hasOwnProperty.call(this, '__ee__')) {
+		data = descriptor.value = create(null);
+		defineProperty(this, '__ee__', descriptor);
+		descriptor.value = null;
+	} else {
+		data = this.__ee__;
+	}
+	if (!data[type]) data[type] = listener;
+	else if (typeof data[type] === 'object') data[type].push(listener);
+	else data[type] = [data[type], listener];
+
+	return this;
+};
+
+once = function (type, listener) {
+	var once, self;
+
+	callable(listener);
+	self = this;
+	on.call(this, type, once = function () {
+		off.call(self, type, once);
+		apply.call(listener, this, arguments);
+	});
+
+	once.__eeOnceListener__ = listener;
+	return this;
+};
+
+off = function (type, listener) {
+	var data, listeners, candidate, i;
+
+	callable(listener);
+
+	if (!hasOwnProperty.call(this, '__ee__')) return this;
+	data = this.__ee__;
+	if (!data[type]) return this;
+	listeners = data[type];
+
+	if (typeof listeners === 'object') {
+		for (i = 0; (candidate = listeners[i]); ++i) {
+			if ((candidate === listener) ||
+					(candidate.__eeOnceListener__ === listener)) {
+				if (listeners.length === 2) data[type] = listeners[i ? 0 : 1];
+				else listeners.splice(i, 1);
+			}
+		}
+	} else {
+		if ((listeners === listener) ||
+				(listeners.__eeOnceListener__ === listener)) {
+			delete data[type];
+		}
+	}
+
+	return this;
+};
+
+emit = function (type) {
+	var i, l, listener, listeners, args;
+
+	if (!hasOwnProperty.call(this, '__ee__')) return;
+	listeners = this.__ee__[type];
+	if (!listeners) return;
+
+	if (typeof listeners === 'object') {
+		l = arguments.length;
+		args = new Array(l - 1);
+		for (i = 1; i < l; ++i) args[i - 1] = arguments[i];
+
+		listeners = listeners.slice();
+		for (i = 0; (listener = listeners[i]); ++i) {
+			apply.call(listener, this, args);
+		}
+	} else {
+		switch (arguments.length) {
+		case 1:
+			call.call(listeners, this);
+			break;
+		case 2:
+			call.call(listeners, this, arguments[1]);
+			break;
+		case 3:
+			call.call(listeners, this, arguments[1], arguments[2]);
+			break;
+		default:
+			l = arguments.length;
+			args = new Array(l - 1);
+			for (i = 1; i < l; ++i) {
+				args[i - 1] = arguments[i];
+			}
+			apply.call(listeners, this, args);
+		}
+	}
+};
+
+methods = {
+	on: on,
+	once: once,
+	off: off,
+	emit: emit
+};
+
+descriptors = {
+	on: d(on),
+	once: d(once),
+	off: d(off),
+	emit: d(emit)
+};
+
+base = defineProperties({}, descriptors);
+
+module.exports = exports = function (o) {
+	return (o == null) ? create(base) : defineProperties(Object(o), descriptors);
+};
+exports.methods = methods;
+
+},{"d":47,"es5-ext/object/valid-callable":31}],52:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -5149,7 +5143,7 @@ module.exports = function(val, options) {
   var type = typeof val;
   if (type === 'string' && val.length > 0) {
     return parse(val);
-  } else if (type === 'number' && isNaN(val) === false) {
+  } else if (type === 'number' && isFinite(val)) {
     return options.long ? fmtLong(val) : fmtShort(val);
   }
   throw new Error(
@@ -5171,7 +5165,7 @@ function parse(str) {
   if (str.length > 100) {
     return;
   }
-  var match = /^((?:\d+)?\-?\d?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+  var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
     str
   );
   if (!match) {
@@ -6443,7 +6437,7 @@ exports.random = function() {
 },{}],70:[function(require,module,exports){
 'use strict';
 
-module.exports = function () {
+module.exports = function() {
   throw new Error(
     'ws does not work in the browser. Browser clients must use the native ' +
       'WebSocket object'
