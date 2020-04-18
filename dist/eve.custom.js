@@ -1,906 +1,1238 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.eve = f()}})(function(){var define,module,exports;return (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-// shim for using process in browser
-var process = module.exports = {};
+exports.Agent = require('./lib/Agent');
+exports.ServiceManager = require('./lib/ServiceManager');
+exports.TransportManager = require('./lib/TransportManager');
 
-// cached from whatever global is present so that test runners that stub it
-// don't break things.  But we need to wrap it in a try catch in case it is
-// wrapped in strict mode code which doesn't define any globals.  It's inside a
-// function because try/catches deoptimize in certain engines.
-
-var cachedSetTimeout;
-var cachedClearTimeout;
-
-function defaultSetTimout() {
-    throw new Error('setTimeout has not been defined');
-}
-function defaultClearTimeout () {
-    throw new Error('clearTimeout has not been defined');
-}
-(function () {
-    try {
-        if (typeof setTimeout === 'function') {
-            cachedSetTimeout = setTimeout;
-        } else {
-            cachedSetTimeout = defaultSetTimout;
-        }
-    } catch (e) {
-        cachedSetTimeout = defaultSetTimout;
-    }
-    try {
-        if (typeof clearTimeout === 'function') {
-            cachedClearTimeout = clearTimeout;
-        } else {
-            cachedClearTimeout = defaultClearTimeout;
-        }
-    } catch (e) {
-        cachedClearTimeout = defaultClearTimeout;
-    }
-} ())
-function runTimeout(fun) {
-    if (cachedSetTimeout === setTimeout) {
-        //normal enviroments in sane situations
-        return setTimeout(fun, 0);
-    }
-    // if setTimeout wasn't available but was latter defined
-    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
-        cachedSetTimeout = setTimeout;
-        return setTimeout(fun, 0);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedSetTimeout(fun, 0);
-    } catch(e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
-            return cachedSetTimeout.call(null, fun, 0);
-        } catch(e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
-            return cachedSetTimeout.call(this, fun, 0);
-        }
-    }
-
-
-}
-function runClearTimeout(marker) {
-    if (cachedClearTimeout === clearTimeout) {
-        //normal enviroments in sane situations
-        return clearTimeout(marker);
-    }
-    // if clearTimeout wasn't available but was latter defined
-    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
-        cachedClearTimeout = clearTimeout;
-        return clearTimeout(marker);
-    }
-    try {
-        // when when somebody has screwed with setTimeout but no I.E. maddness
-        return cachedClearTimeout(marker);
-    } catch (e){
-        try {
-            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
-            return cachedClearTimeout.call(null, marker);
-        } catch (e){
-            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
-            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
-            return cachedClearTimeout.call(this, marker);
-        }
-    }
-
-
-
-}
-var queue = [];
-var draining = false;
-var currentQueue;
-var queueIndex = -1;
-
-function cleanUpNextTick() {
-    if (!draining || !currentQueue) {
-        return;
-    }
-    draining = false;
-    if (currentQueue.length) {
-        queue = currentQueue.concat(queue);
-    } else {
-        queueIndex = -1;
-    }
-    if (queue.length) {
-        drainQueue();
-    }
-}
-
-function drainQueue() {
-    if (draining) {
-        return;
-    }
-    var timeout = runTimeout(cleanUpNextTick);
-    draining = true;
-
-    var len = queue.length;
-    while(len) {
-        currentQueue = queue;
-        queue = [];
-        while (++queueIndex < len) {
-            if (currentQueue) {
-                currentQueue[queueIndex].run();
-            }
-        }
-        queueIndex = -1;
-        len = queue.length;
-    }
-    currentQueue = null;
-    draining = false;
-    runClearTimeout(timeout);
-}
-
-process.nextTick = function (fun) {
-    var args = new Array(arguments.length - 1);
-    if (arguments.length > 1) {
-        for (var i = 1; i < arguments.length; i++) {
-            args[i - 1] = arguments[i];
-        }
-    }
-    queue.push(new Item(fun, args));
-    if (queue.length === 1 && !draining) {
-        runTimeout(drainQueue);
-    }
+exports.transport = {
+  LocalTransport:     require('./lib/transport/local/LocalTransport')
 };
 
-// v8 likes predictible objects
-function Item(fun, array) {
-    this.fun = fun;
-    this.array = array;
-}
-Item.prototype.run = function () {
-    this.fun.apply(null, this.array);
-};
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-process.version = ''; // empty string to avoid regexp issues
-process.versions = {};
+exports.TransportManager.registerType(exports.transport.LocalTransport);
 
-function noop() {}
+// load the default ServiceManager, a singleton, initialized with a LocalTransport
+exports.system = new exports.ServiceManager();
+exports.system.transports.add(new exports.transport.LocalTransport());
 
-process.on = noop;
-process.addListener = noop;
-process.once = noop;
-process.off = noop;
-process.removeListener = noop;
-process.removeAllListeners = noop;
-process.emit = noop;
-process.prependListener = noop;
-process.prependOnceListener = noop;
-
-process.listeners = function (name) { return [] }
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
+// override Agent.getTransportById in order to support Agent.connect(transportId)
+exports.Agent.getTransportById = function (id) {
+  return exports.system.transports.get(id);
 };
 
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-process.umask = function() { return 0; };
-
-},{}],2:[function(require,module,exports){
-(function (global){
-/*! https://mths.be/punycode v1.4.1 by @mathias */
-;(function(root) {
-
-	/** Detect free variables */
-	var freeExports = typeof exports == 'object' && exports &&
-		!exports.nodeType && exports;
-	var freeModule = typeof module == 'object' && module &&
-		!module.nodeType && module;
-	var freeGlobal = typeof global == 'object' && global;
-	if (
-		freeGlobal.global === freeGlobal ||
-		freeGlobal.window === freeGlobal ||
-		freeGlobal.self === freeGlobal
-	) {
-		root = freeGlobal;
-	}
-
-	/**
-	 * The `punycode` object.
-	 * @name punycode
-	 * @type Object
-	 */
-	var punycode,
-
-	/** Highest positive signed 32-bit float value */
-	maxInt = 2147483647, // aka. 0x7FFFFFFF or 2^31-1
-
-	/** Bootstring parameters */
-	base = 36,
-	tMin = 1,
-	tMax = 26,
-	skew = 38,
-	damp = 700,
-	initialBias = 72,
-	initialN = 128, // 0x80
-	delimiter = '-', // '\x2D'
-
-	/** Regular expressions */
-	regexPunycode = /^xn--/,
-	regexNonASCII = /[^\x20-\x7E]/, // unprintable ASCII chars + non-ASCII chars
-	regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g, // RFC 3490 separators
-
-	/** Error messages */
-	errors = {
-		'overflow': 'Overflow: input needs wider integers to process',
-		'not-basic': 'Illegal input >= 0x80 (not a basic code point)',
-		'invalid-input': 'Invalid input'
-	},
-
-	/** Convenience shortcuts */
-	baseMinusTMin = base - tMin,
-	floor = Math.floor,
-	stringFromCharCode = String.fromCharCode,
-
-	/** Temporary variable */
-	key;
-
-	/*--------------------------------------------------------------------------*/
-
-	/**
-	 * A generic error utility function.
-	 * @private
-	 * @param {String} type The error type.
-	 * @returns {Error} Throws a `RangeError` with the applicable error message.
-	 */
-	function error(type) {
-		throw new RangeError(errors[type]);
-	}
-
-	/**
-	 * A generic `Array#map` utility function.
-	 * @private
-	 * @param {Array} array The array to iterate over.
-	 * @param {Function} callback The function that gets called for every array
-	 * item.
-	 * @returns {Array} A new array of values returned by the callback function.
-	 */
-	function map(array, fn) {
-		var length = array.length;
-		var result = [];
-		while (length--) {
-			result[length] = fn(array[length]);
-		}
-		return result;
-	}
-
-	/**
-	 * A simple `Array#map`-like wrapper to work with domain name strings or email
-	 * addresses.
-	 * @private
-	 * @param {String} domain The domain name or email address.
-	 * @param {Function} callback The function that gets called for every
-	 * character.
-	 * @returns {Array} A new string of characters returned by the callback
-	 * function.
-	 */
-	function mapDomain(string, fn) {
-		var parts = string.split('@');
-		var result = '';
-		if (parts.length > 1) {
-			// In email addresses, only the domain name should be punycoded. Leave
-			// the local part (i.e. everything up to `@`) intact.
-			result = parts[0] + '@';
-			string = parts[1];
-		}
-		// Avoid `split(regex)` for IE8 compatibility. See #17.
-		string = string.replace(regexSeparators, '\x2E');
-		var labels = string.split('.');
-		var encoded = map(labels, fn).join('.');
-		return result + encoded;
-	}
-
-	/**
-	 * Creates an array containing the numeric code points of each Unicode
-	 * character in the string. While JavaScript uses UCS-2 internally,
-	 * this function will convert a pair of surrogate halves (each of which
-	 * UCS-2 exposes as separate characters) into a single code point,
-	 * matching UTF-16.
-	 * @see `punycode.ucs2.encode`
-	 * @see <https://mathiasbynens.be/notes/javascript-encoding>
-	 * @memberOf punycode.ucs2
-	 * @name decode
-	 * @param {String} string The Unicode input string (UCS-2).
-	 * @returns {Array} The new array of code points.
-	 */
-	function ucs2decode(string) {
-		var output = [],
-		    counter = 0,
-		    length = string.length,
-		    value,
-		    extra;
-		while (counter < length) {
-			value = string.charCodeAt(counter++);
-			if (value >= 0xD800 && value <= 0xDBFF && counter < length) {
-				// high surrogate, and there is a next character
-				extra = string.charCodeAt(counter++);
-				if ((extra & 0xFC00) == 0xDC00) { // low surrogate
-					output.push(((value & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000);
-				} else {
-					// unmatched surrogate; only append this code unit, in case the next
-					// code unit is the high surrogate of a surrogate pair
-					output.push(value);
-					counter--;
-				}
-			} else {
-				output.push(value);
-			}
-		}
-		return output;
-	}
-
-	/**
-	 * Creates a string based on an array of numeric code points.
-	 * @see `punycode.ucs2.decode`
-	 * @memberOf punycode.ucs2
-	 * @name encode
-	 * @param {Array} codePoints The array of numeric code points.
-	 * @returns {String} The new Unicode string (UCS-2).
-	 */
-	function ucs2encode(array) {
-		return map(array, function(value) {
-			var output = '';
-			if (value > 0xFFFF) {
-				value -= 0x10000;
-				output += stringFromCharCode(value >>> 10 & 0x3FF | 0xD800);
-				value = 0xDC00 | value & 0x3FF;
-			}
-			output += stringFromCharCode(value);
-			return output;
-		}).join('');
-	}
-
-	/**
-	 * Converts a basic code point into a digit/integer.
-	 * @see `digitToBasic()`
-	 * @private
-	 * @param {Number} codePoint The basic numeric code point value.
-	 * @returns {Number} The numeric value of a basic code point (for use in
-	 * representing integers) in the range `0` to `base - 1`, or `base` if
-	 * the code point does not represent a value.
-	 */
-	function basicToDigit(codePoint) {
-		if (codePoint - 48 < 10) {
-			return codePoint - 22;
-		}
-		if (codePoint - 65 < 26) {
-			return codePoint - 65;
-		}
-		if (codePoint - 97 < 26) {
-			return codePoint - 97;
-		}
-		return base;
-	}
-
-	/**
-	 * Converts a digit/integer into a basic code point.
-	 * @see `basicToDigit()`
-	 * @private
-	 * @param {Number} digit The numeric value of a basic code point.
-	 * @returns {Number} The basic code point whose value (when used for
-	 * representing integers) is `digit`, which needs to be in the range
-	 * `0` to `base - 1`. If `flag` is non-zero, the uppercase form is
-	 * used; else, the lowercase form is used. The behavior is undefined
-	 * if `flag` is non-zero and `digit` has no uppercase form.
-	 */
-	function digitToBasic(digit, flag) {
-		//  0..25 map to ASCII a..z or A..Z
-		// 26..35 map to ASCII 0..9
-		return digit + 22 + 75 * (digit < 26) - ((flag != 0) << 5);
-	}
-
-	/**
-	 * Bias adaptation function as per section 3.4 of RFC 3492.
-	 * https://tools.ietf.org/html/rfc3492#section-3.4
-	 * @private
-	 */
-	function adapt(delta, numPoints, firstTime) {
-		var k = 0;
-		delta = firstTime ? floor(delta / damp) : delta >> 1;
-		delta += floor(delta / numPoints);
-		for (/* no initialization */; delta > baseMinusTMin * tMax >> 1; k += base) {
-			delta = floor(delta / baseMinusTMin);
-		}
-		return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
-	}
-
-	/**
-	 * Converts a Punycode string of ASCII-only symbols to a string of Unicode
-	 * symbols.
-	 * @memberOf punycode
-	 * @param {String} input The Punycode string of ASCII-only symbols.
-	 * @returns {String} The resulting string of Unicode symbols.
-	 */
-	function decode(input) {
-		// Don't use UCS-2
-		var output = [],
-		    inputLength = input.length,
-		    out,
-		    i = 0,
-		    n = initialN,
-		    bias = initialBias,
-		    basic,
-		    j,
-		    index,
-		    oldi,
-		    w,
-		    k,
-		    digit,
-		    t,
-		    /** Cached calculation results */
-		    baseMinusT;
-
-		// Handle the basic code points: let `basic` be the number of input code
-		// points before the last delimiter, or `0` if there is none, then copy
-		// the first basic code points to the output.
-
-		basic = input.lastIndexOf(delimiter);
-		if (basic < 0) {
-			basic = 0;
-		}
-
-		for (j = 0; j < basic; ++j) {
-			// if it's not a basic code point
-			if (input.charCodeAt(j) >= 0x80) {
-				error('not-basic');
-			}
-			output.push(input.charCodeAt(j));
-		}
-
-		// Main decoding loop: start just after the last delimiter if any basic code
-		// points were copied; start at the beginning otherwise.
-
-		for (index = basic > 0 ? basic + 1 : 0; index < inputLength; /* no final expression */) {
-
-			// `index` is the index of the next character to be consumed.
-			// Decode a generalized variable-length integer into `delta`,
-			// which gets added to `i`. The overflow checking is easier
-			// if we increase `i` as we go, then subtract off its starting
-			// value at the end to obtain `delta`.
-			for (oldi = i, w = 1, k = base; /* no condition */; k += base) {
-
-				if (index >= inputLength) {
-					error('invalid-input');
-				}
-
-				digit = basicToDigit(input.charCodeAt(index++));
-
-				if (digit >= base || digit > floor((maxInt - i) / w)) {
-					error('overflow');
-				}
-
-				i += digit * w;
-				t = k <= bias ? tMin : (k >= bias + tMax ? tMax : k - bias);
-
-				if (digit < t) {
-					break;
-				}
-
-				baseMinusT = base - t;
-				if (w > floor(maxInt / baseMinusT)) {
-					error('overflow');
-				}
-
-				w *= baseMinusT;
-
-			}
-
-			out = output.length + 1;
-			bias = adapt(i - oldi, out, oldi == 0);
-
-			// `i` was supposed to wrap around from `out` to `0`,
-			// incrementing `n` each time, so we'll fix that now:
-			if (floor(i / out) > maxInt - n) {
-				error('overflow');
-			}
-
-			n += floor(i / out);
-			i %= out;
-
-			// Insert `n` at position `i` of the output
-			output.splice(i++, 0, n);
-
-		}
-
-		return ucs2encode(output);
-	}
-
-	/**
-	 * Converts a string of Unicode symbols (e.g. a domain name label) to a
-	 * Punycode string of ASCII-only symbols.
-	 * @memberOf punycode
-	 * @param {String} input The string of Unicode symbols.
-	 * @returns {String} The resulting Punycode string of ASCII-only symbols.
-	 */
-	function encode(input) {
-		var n,
-		    delta,
-		    handledCPCount,
-		    basicLength,
-		    bias,
-		    j,
-		    m,
-		    q,
-		    k,
-		    t,
-		    currentValue,
-		    output = [],
-		    /** `inputLength` will hold the number of code points in `input`. */
-		    inputLength,
-		    /** Cached calculation results */
-		    handledCPCountPlusOne,
-		    baseMinusT,
-		    qMinusT;
-
-		// Convert the input in UCS-2 to Unicode
-		input = ucs2decode(input);
-
-		// Cache the length
-		inputLength = input.length;
-
-		// Initialize the state
-		n = initialN;
-		delta = 0;
-		bias = initialBias;
-
-		// Handle the basic code points
-		for (j = 0; j < inputLength; ++j) {
-			currentValue = input[j];
-			if (currentValue < 0x80) {
-				output.push(stringFromCharCode(currentValue));
-			}
-		}
-
-		handledCPCount = basicLength = output.length;
-
-		// `handledCPCount` is the number of code points that have been handled;
-		// `basicLength` is the number of basic code points.
-
-		// Finish the basic string - if it is not empty - with a delimiter
-		if (basicLength) {
-			output.push(delimiter);
-		}
-
-		// Main encoding loop:
-		while (handledCPCount < inputLength) {
-
-			// All non-basic code points < n have been handled already. Find the next
-			// larger one:
-			for (m = maxInt, j = 0; j < inputLength; ++j) {
-				currentValue = input[j];
-				if (currentValue >= n && currentValue < m) {
-					m = currentValue;
-				}
-			}
-
-			// Increase `delta` enough to advance the decoder's <n,i> state to <m,0>,
-			// but guard against overflow
-			handledCPCountPlusOne = handledCPCount + 1;
-			if (m - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
-				error('overflow');
-			}
-
-			delta += (m - n) * handledCPCountPlusOne;
-			n = m;
-
-			for (j = 0; j < inputLength; ++j) {
-				currentValue = input[j];
-
-				if (currentValue < n && ++delta > maxInt) {
-					error('overflow');
-				}
-
-				if (currentValue == n) {
-					// Represent delta as a generalized variable-length integer
-					for (q = delta, k = base; /* no condition */; k += base) {
-						t = k <= bias ? tMin : (k >= bias + tMax ? tMax : k - bias);
-						if (q < t) {
-							break;
-						}
-						qMinusT = q - t;
-						baseMinusT = base - t;
-						output.push(
-							stringFromCharCode(digitToBasic(t + qMinusT % baseMinusT, 0))
-						);
-						q = floor(qMinusT / baseMinusT);
-					}
-
-					output.push(stringFromCharCode(digitToBasic(q, 0)));
-					bias = adapt(delta, handledCPCountPlusOne, handledCPCount == basicLength);
-					delta = 0;
-					++handledCPCount;
-				}
-			}
-
-			++delta;
-			++n;
-
-		}
-		return output.join('');
-	}
-
-	/**
-	 * Converts a Punycode string representing a domain name or an email address
-	 * to Unicode. Only the Punycoded parts of the input will be converted, i.e.
-	 * it doesn't matter if you call it on a string that has already been
-	 * converted to Unicode.
-	 * @memberOf punycode
-	 * @param {String} input The Punycoded domain name or email address to
-	 * convert to Unicode.
-	 * @returns {String} The Unicode representation of the given Punycode
-	 * string.
-	 */
-	function toUnicode(input) {
-		return mapDomain(input, function(string) {
-			return regexPunycode.test(string)
-				? decode(string.slice(4).toLowerCase())
-				: string;
-		});
-	}
-
-	/**
-	 * Converts a Unicode string representing a domain name or an email address to
-	 * Punycode. Only the non-ASCII parts of the domain name will be converted,
-	 * i.e. it doesn't matter if you call it with a domain that's already in
-	 * ASCII.
-	 * @memberOf punycode
-	 * @param {String} input The domain name or email address to convert, as a
-	 * Unicode string.
-	 * @returns {String} The Punycode representation of the given domain name or
-	 * email address.
-	 */
-	function toASCII(input) {
-		return mapDomain(input, function(string) {
-			return regexNonASCII.test(string)
-				? 'xn--' + encode(string)
-				: string;
-		});
-	}
-
-	/*--------------------------------------------------------------------------*/
-
-	/** Define the public API */
-	punycode = {
-		/**
-		 * A string representing the current Punycode.js version number.
-		 * @memberOf punycode
-		 * @type String
-		 */
-		'version': '1.4.1',
-		/**
-		 * An object of methods to convert from JavaScript's internal character
-		 * representation (UCS-2) to Unicode code points, and back.
-		 * @see <https://mathiasbynens.be/notes/javascript-encoding>
-		 * @memberOf punycode
-		 * @type Object
-		 */
-		'ucs2': {
-			'decode': ucs2decode,
-			'encode': ucs2encode
-		},
-		'decode': decode,
-		'encode': encode,
-		'toASCII': toASCII,
-		'toUnicode': toUnicode
-	};
-
-	/** Expose `punycode` */
-	// Some AMD build optimizers, like r.js, check for specific condition patterns
-	// like the following:
-	if (
-		typeof define == 'function' &&
-		typeof define.amd == 'object' &&
-		define.amd
-	) {
-		define('punycode', function() {
-			return punycode;
-		});
-	} else if (freeExports && freeModule) {
-		if (module.exports == freeExports) {
-			// in Node.js, io.js, or RingoJS v0.8.0+
-			freeModule.exports = punycode;
-		} else {
-			// in Narwhal or RingoJS v0.7.0-
-			for (key in punycode) {
-				punycode.hasOwnProperty(key) && (freeExports[key] = punycode[key]);
-			}
-		}
-	} else {
-		// in Rhino or a web browser
-		root.punycode = punycode;
-	}
-
-}(this));
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],3:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+},{"./lib/Agent":2,"./lib/ServiceManager":3,"./lib/TransportManager":4,"./lib/transport/local/LocalTransport":8}],2:[function(require,module,exports){
 'use strict';
 
-// If obj.hasOwnProperty has been overridden, then calling
-// obj.hasOwnProperty(prop) will break.
-// See: https://github.com/joyent/node/issues/1707
-function hasOwnProperty(obj, prop) {
-  return Object.prototype.hasOwnProperty.call(obj, prop);
+var Promise = require('promise');
+var uuid = require('uuid-v4');
+var util = require('./util');
+var URL = require('url');
+
+/**
+ * Agent
+ * @param {string} [id]         Id for the agent. If not provided, the agent
+ *                              will be given a uuid.
+ * @constructor
+ */
+function Agent(id) {
+  this.id = id ? id.toString() : uuid();
+
+  // a list with all connected transports
+  this.connections = [];
+  this.defaultConnection = null;
+  this.ready = Promise.resolve([]);
 }
 
-module.exports = function(qs, sep, eq, options) {
-  sep = sep || '&';
-  eq = eq || '=';
-  var obj = {};
+// an object with modules which can be used to extend the agent
+Agent.modules = {};
 
-  if (typeof qs !== 'string' || qs.length === 0) {
-    return obj;
+/**
+ * Register a new type of module. This module can then be loaded via
+ * Agent.extend() and Agent.loadModule().
+ * @param {Function} constructor     A module constructor
+ */
+Agent.registerModule = function (constructor) {
+  var type = constructor.prototype.type;
+  if (typeof constructor !== 'function') {
+    throw new Error('Constructor function expected');
   }
-
-  var regexp = /\+/g;
-  qs = qs.split(sep);
-
-  var maxKeys = 1000;
-  if (options && typeof options.maxKeys === 'number') {
-    maxKeys = options.maxKeys;
+  if (!type) {
+    throw new Error('Field "prototype.type" missing in transport constructor');
   }
-
-  var len = qs.length;
-  // maxKeys <= 0 means that we should not limit keys count
-  if (maxKeys > 0 && len > maxKeys) {
-    len = maxKeys;
-  }
-
-  for (var i = 0; i < len; ++i) {
-    var x = qs[i].replace(regexp, '%20'),
-        idx = x.indexOf(eq),
-        kstr, vstr, k, v;
-
-    if (idx >= 0) {
-      kstr = x.substr(0, idx);
-      vstr = x.substr(idx + 1);
-    } else {
-      kstr = x;
-      vstr = '';
-    }
-
-    k = decodeURIComponent(kstr);
-    v = decodeURIComponent(vstr);
-
-    if (!hasOwnProperty(obj, k)) {
-      obj[k] = v;
-    } else if (isArray(obj[k])) {
-      obj[k].push(v);
-    } else {
-      obj[k] = [obj[k], v];
+  if (type in Agent.modules) {
+    if (Agent.modules[type] !== constructor) {
+      throw new Error('Module of type "' + type + '" already exists');
     }
   }
 
-  return obj;
+  Agent.modules[type] = constructor;
 };
 
-var isArray = Array.isArray || function (xs) {
-  return Object.prototype.toString.call(xs) === '[object Array]';
+/**
+ * Get a transport by id.
+ * This static method can be overloaded for example by the get function of
+ * a singleton TransportManager.
+ * @param {string} id
+ * @return {Transport}
+ */
+Agent.getTransportById = function (id) {
+  throw new Error('Transport with id "' + id + '" not found');
 };
 
-},{}],4:[function(require,module,exports){
-// Copyright Joyent, Inc. and other Node contributors.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the
-// "Software"), to deal in the Software without restriction, including
-// without limitation the rights to use, copy, modify, merge, publish,
-// distribute, sublicense, and/or sell copies of the Software, and to permit
-// persons to whom the Software is furnished to do so, subject to the
-// following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-// USE OR OTHER DEALINGS IN THE SOFTWARE.
+/**
+ * Extend an agent with modules (mixins).
+ * The modules new functions are added to the Agent itself.
+ * See also function `loadModule`.
+ * @param {string | string[]} module  A module name or an Array with module
+ *                                    names. Available modules:
+ *                                    'pattern', 'request', 'babble'
+ * @param {Object} [options]          Additional options for loading the module
+ * @return {Agent} Returns the agent itself
+ */
+Agent.prototype.extend = function (module, options) {
+  if (Array.isArray(module)) {
+    var modules = [].concat(module);
 
-'use strict';
+    // order the modules such that 'pattern' comes first, this module must be
+    // loaded before other modules ('request' specifically)
+    modules.sort(function (a, b) {
+      if (a == 'pattern') return -1;
+      if (b == 'pattern') return 1;
+      return 0;
+    });
 
-var stringifyPrimitive = function(v) {
-  switch (typeof v) {
-    case 'string':
-      return v;
-
-    case 'boolean':
-      return v ? 'true' : 'false';
-
-    case 'number':
-      return isFinite(v) ? v : '';
-
-    default:
-      return '';
+    // an array with module names
+    for (var i = 0; i < modules.length; i++) {
+      this.extend(modules[i], options)
+    }
   }
-};
+  else {
+    // a single module name
+    var constructor = _getModuleConstructor(module);
+    var instance = new constructor(this, options);
+    var mixin = instance.mixin();
 
-module.exports = function(obj, sep, eq, name) {
-  sep = sep || '&';
-  eq = eq || '=';
-  if (obj === null) {
-    obj = undefined;
-  }
-
-  if (typeof obj === 'object') {
-    return map(objectKeys(obj), function(k) {
-      var ks = encodeURIComponent(stringifyPrimitive(k)) + eq;
-      if (isArray(obj[k])) {
-        return map(obj[k], function(v) {
-          return ks + encodeURIComponent(stringifyPrimitive(v));
-        }).join(sep);
-      } else {
-        return ks + encodeURIComponent(stringifyPrimitive(obj[k]));
+    // check for conflicts in the modules mixin functions
+    var me = this;
+    Object.keys(mixin).forEach(function (name) {
+      if (me[name] !== undefined && name !== '_receive') {
+        throw new Error('Conflict: agent already has a property "' + prop + '"');
       }
-    }).join(sep);
+    });
 
+    // extend the agent with all mixin functions provided by the module
+    Object.keys(mixin).forEach(function (name) {
+      me[name] = mixin[name];
+    });
   }
 
-  if (!name) return '';
-  return encodeURIComponent(stringifyPrimitive(name)) + eq +
-         encodeURIComponent(stringifyPrimitive(obj));
+  return this;
 };
 
-var isArray = Array.isArray || function (xs) {
-  return Object.prototype.toString.call(xs) === '[object Array]';
+/**
+ * Load a module onto an agent.
+ * See also function `extend`.
+ * @param {string | string[]} module  A module name or an Array with module
+ *                                    names. Available modules:
+ *                                    'pattern', 'request', 'babble'
+ * @param {Object} [options]          Additional options for loading the module
+ * @return {Object} Returns the created module
+ */
+Agent.prototype.loadModule = function (module, options, additionalOptions) {
+  var _options = options !== undefined ? Object.create(options) : {};
+  _options.extend = false;
+
+  var constructor = _getModuleConstructor(module);
+  var instance = new constructor(this, options, additionalOptions);
+  var mixin = instance.mixin();
+
+  // only replace the _receive function, do not add other mixin functions
+  this._receive = mixin._receive;
+
+  return instance;
 };
 
-function map (xs, f) {
-  if (xs.map) return xs.map(f);
-  var res = [];
-  for (var i = 0; i < xs.length; i++) {
-    res.push(f(xs[i], i));
+/**
+ * Get a module constructor by it's name.
+ * Throws an error when the module is not found.
+ * @param {string} name
+ * @return {function} Returns the modules constructor function
+ * @private
+ */
+function _getModuleConstructor(name) {
+  var constructor = Agent.modules[name];
+  if (!constructor) {
+    throw new Error('Unknown module "' + name + '". ' +
+      'Choose from: ' + Object.keys(Agent.modules).map(JSON.stringify).join(', '));
   }
-  return res;
+  return constructor;
 }
 
-var objectKeys = Object.keys || function (obj) {
-  var res = [];
-  for (var key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) res.push(key);
+/**
+ * Send a message to an agent
+ * @param {string} to
+ *              to is either:
+ *              - A string "agentId", the id of the recipient. Will be send
+ *                via the default transport or when there is no default
+ *                transport via the first connected transport.
+ *              - A string "agentId@transportId" Only usable locally, not
+ *                for sharing an address with remote agents.
+ *              - A string "protocol://networkId/agentId". This is a sharable
+ *                identifier for an agent.
+ * @param {*} message  Message to be send
+ * @return {Promise} Returns a promise which resolves when the message as
+ *                   successfully been sent, or rejected when sending the
+ *                   message failed
+ */
+Agent.prototype.send = function (to, message) {
+
+  var colon = to.indexOf(':');
+  if (colon !== -1) {
+    var url = URL.parse(to);
+
+    //TODO: Fix this for protocols that use networkId instead of host (Needs to be fixed in the protocol itself.)
+    return this._sendByProtocol(url.protocol.slice(0, -1), to, message);
   }
-  return res;
+
+  // TODO: deprecate this notation "agentId@transportId"?
+  var at = to.indexOf('@');
+  if (at != -1) {
+    // to is an id like "agentId@transportId"
+    var _to = to.substring(0, at);
+    var _transportId = to.substring(at + 1);
+    return this._sendByTransportId(_transportId, _to, message);
+  }
+
+  // to is an id like "agentId". Send via the default transport
+  var conn = this.defaultConnection;
+  if (conn) {
+    return conn.send(to, message);
+  }
+  else {
+    return Promise.reject(new Error('No transport found'));
+  }
 };
+
+/**
+ * Send a transport to an agent given a networkId
+ * @param {string} networkId    A network id
+ * @param {string} to           An agents id
+ * @param {string} message      Message to be send
+ * @return {Promise} Returns a promise which resolves when the message as
+ *                   successfully been sent, or rejected when sending the
+ *                   message failed
+ * @private
+ */
+Agent.prototype._sendByNetworkId = function (networkId, to, message) {
+  // TODO: change this.connections to a map with networkId as keys, much faster
+  for (var i = 0; i < this.connections.length; i++) {
+    var connection = this.connections[i];
+    if (connection.transport.networkId == networkId) {
+      return connection.send(to, message);
+    }
+  }
+
+  return Promise.reject(new Error('No transport found with networkId "' + networkId + '"'));
+};
+
+/**
+ * Send a message by a transport by protocol.
+ * The message will be send via the first found transport having the specified
+ * protocol.
+ * @param {string} protocol     A protocol, for example 'http' or 'ws'
+ * @param {string} to           An agents id
+ * @param {string} message      Message to be send
+ * @return {Promise} Returns a promise which resolves when the message as
+ *                   successfully been sent, or rejected when sending the
+ *                   message failed
+ * @private
+ */
+Agent.prototype._sendByProtocol = function (protocol, to, message) {
+
+  // the https addresses also make use of the http protocol.
+  protocol = protocol == 'https' ? 'http' : protocol;
+
+  for (var i = 0; i < this.connections.length; i++) {
+    var connection = this.connections[i];
+    if (connection.transport.type == protocol) {
+      return connection.send(to, message);
+    }
+  }
+
+  return Promise.reject(new Error('No transport found for protocol "' + protocol + '"'));
+};
+
+/**
+ * Send a transport to an agent via a specific transport
+ * @param {string} transportId  The configured id of a transport.
+ * @param {string} to           An agents id
+ * @param {string} message      Message to be send
+ * @return {Promise} Returns a promise which resolves when the message as
+ *                   successfully been sent, or rejected when sending the
+ *                   message failed
+ * @private
+ */
+Agent.prototype._sendByTransportId = function (transportId, to, message) {
+  for (var i = 0; i < this.connections.length; i++) {
+    var connection = this.connections[i];
+    if (connection.transport.id == transportId) {
+      return connection.send(to, message);
+    }
+  }
+
+  return Promise.reject(new Error('No transport found with id "' + transportId + '"'));
+};
+
+/**
+ * Receive a message.
+ * @param {string} from     Id of sender
+ * @param {*} message       Received message, a JSON object (often a string)
+ */
+Agent.prototype.receive = function (from, message, oobParams) {
+  // ... to be overloaded
+};
+
+/**
+ * The method _receive is overloaded in a cascaded way by modules, and calls
+ * the public method Agent.receive at the end of the chain.
+ * @param {string} from     Id of sender
+ * @param {*} message       Received message, a JSON object (often a string)
+ * @param {array} oobParams Optional Out of Band parameters, e.g. query params for http
+ * @returns {*} Returns the return value of Agent.receive
+ * @private
+ */
+Agent.prototype._receive = function (from, message, oobParams) {
+  return this.receive(from, message);
+};
+
+Agent.prototype.getUrls = function () {
+  return this.connections.map(function (connection) {
+    return connection.getMyUrl()
+  });
+};
+
+Agent.prototype.getUrlByProtocol = function (protocol) {
+  for (var i = 0; i < this.connections.length; i++) {
+    var connection = this.connections[i];
+    if (connection.transport.type == protocol) {
+      return connection.getMyUrl();
+    }
+  }
+};
+
+/**
+ * Connect to a transport. The agent will subscribe itself to
+ * messages sent to his id.
+ * @param {string | Transport | Transport[] | string[]} transport
+ *                                  A Transport instance, or the id of a
+ *                                  transport loaded in eve.system.
+ * @param {string} [id]             An optional alternative id to be used
+ *                                  for the connection. By default, the agents
+ *                                  own id is used.
+ * @return {Connection | Connection[]}  Returns a connection or, in case of
+ *                                      multiple transports, returns an
+ *                                      array with connections. The connections
+ *                                      have a promise .ready which resolves
+ *                                      as soon as the connection is ready for
+ *                                      use.
+ */
+Agent.prototype.connect = function (transport, id) {
+  if (Array.isArray(transport)) {
+    var me = this;
+    return transport.map(function (_transport) {
+        try {
+          return me._connect(_transport, id);
+        } catch (e) {
+          return {error: e}
+        }
+      }
+    );
+  }
+  else if (typeof transport === 'string') {
+    // get transport by id
+    try {
+      return this._connect(Agent.getTransportById(transport), id);
+    } catch (e) {
+      return {error: e}
+    }
+  }
+  else {
+    // a transport instance
+    try {
+      return this._connect(transport, id);
+    } catch (e) {
+      return {error: e}
+    }
+  }
+};
+
+/**
+ * Connect to a transport
+ * @param {Transport} transport     A Transport instance
+ * @param {string} [id]             An optional alternative id to be used
+ *                                  for the connection. By default, the agents
+ *                                  own id is used.
+ * @return {Connection}             Returns a connection.
+ * @private
+ */
+Agent.prototype._connect = function (transport, id) {
+  // create a receive function which is bound to the _receive function.
+  // the _receive function can be replaced in by modules in a cascaded way,
+  // and in the end calls this.receive of the agent.
+  // note: we don't do receive = this._receive.bind(this) as the _receive
+  //       function can be overloaded after a connection is made.
+  var me = this;
+  var receive = function (from, message, oobParams) {
+    return me._receive(from, message, oobParams);
+  };
+  var connection = transport.connect(id || this.id, receive);
+  this.connections.push(connection);
+
+  // set or replace the defaultConnection
+  if (!this.defaultConnection) {
+    this.defaultConnection = connection;
+  }
+  else if (transport['default']) {
+    if (this.defaultConnection['default']) {
+      throw new Error('Cannot connect to a second default transport');
+    }
+    this.defaultConnection = connection;
+  }
+
+  this._updateReady();
+
+  return connection;
+};
+
+/**
+ * Disconnect from one or multiple transports
+ * @param {string | Transport | string[] | Transport[]} [transport]
+ *              A transport or an array with transports.
+ *              parameter transport can be an instance of a Transport, or the
+ *              id of a transport.
+ *              When transport is undefined, the agent will be disconnected
+ *              from all connected transports.
+ */
+Agent.prototype.disconnect = function (transport) {
+  var i, connection;
+
+  if (!transport) {
+    // disconnect all transports
+    while (connection = this.connections[0]) {
+      this._disconnect(connection);
+    }
+  }
+  else if (Array.isArray(transport)) {
+    // an array with transports
+    i = 0;
+    while (i < this.connections.length) {
+      connection = this.connections[i];
+      if (transport.indexOf(connection.transport) !== -1) {
+        this._disconnect(connection);
+      }
+      else {
+        i++;
+      }
+    }
+  }
+  else if (typeof transport === 'string') {
+    // transport by id
+    this.disconnect(Agent.getTransportById(transport));
+  }
+  else {
+    // a single transport
+    for (i = 0; i < this.connections.length; i++) {
+      connection = this.connections[i];
+      if (connection.transport === transport) {
+        this._disconnect(connection);
+        break;
+      }
+    }
+  }
+};
+
+/**
+ * Close a connection
+ * @param {Connection} connection
+ * @private
+ */
+Agent.prototype._disconnect = function (connection) {
+  // find the connection
+  var index = this.connections.indexOf(connection);
+  if (index !== -1) {
+    // close the connection
+    connection.close();
+
+    // remove from the list with connections
+    this.connections.splice(index, 1);
+
+    // replace the defaultConnection if needed
+    if (this.defaultConnection === connection) {
+      this.defaultConnection = this.connections[this.connections.length - 1] || null;
+    }
+  }
+
+  this._updateReady();
+};
+
+/**
+ * Update the ready state of the agent
+ * @private
+ */
+Agent.prototype._updateReady = function () {
+  // FIXME: we should not replace with a new Promise,
+  //        we have a problem when this.ready is requested before ready,
+  //        and another connection is opened before ready
+  this.ready = Promise.all(this.connections.map(function (connection) {
+    return connection.ready;
+  }));
+};
+
+module.exports = Agent;
+
+},{"./util":9,"promise":55,"url":12,"uuid-v4":68}],3:[function(require,module,exports){
+'use strict';
+
+var seed = require('seed-random');
+var hypertimer = require('hypertimer');
+var TransportManager = require('./TransportManager');
+
+// map with known configuration properties
+var KNOWN_PROPERTIES = {
+  transports: true,
+  timer: true,
+  random: true
+};
+
+function ServiceManager(config) {
+  this.transports = new TransportManager();
+
+  this.timer = hypertimer();
+
+  this.random = Math.random;
+
+  this.init(config);
+}
+
+/**
+ * Initialize the service manager with services loaded from a configuration
+ * object. All current services are unloaded and removed.
+ * @param {Object} config
+ */
+ServiceManager.prototype.init = function (config) {
+  this.transports.clear();
+
+  if (config) {
+    if (config.transports) {
+      this.transports.load(config.transports);
+    }
+
+    if (config.timer) {
+      this.timer.config(config.timer);
+    }
+
+    if (config.random) {
+      if (config.random.deterministic) {
+        var key = config.random.seed || 'random seed';
+        this.random = seed(key, config.random);
+      }
+      else {
+        this.random = Math.random;
+      }
+    }
+
+    for (var prop in config) {
+      if (config.hasOwnProperty(prop) && !KNOWN_PROPERTIES[prop]) {
+        // TODO: should log this warning via a configured logger
+        console.log('WARNING: Unknown configuration option "' + prop + '"')
+      }
+    }
+  }
+};
+
+/**
+ * Clear all configured services
+ */
+ServiceManager.prototype.clear = function () {
+  this.transports.clear();
+};
+
+module.exports = ServiceManager;
+
+},{"./TransportManager":4,"hypertimer":30,"seed-random":67}],4:[function(require,module,exports){
+'use strict';
+
+/**
+ * A manager for loading and finding transports.
+ * @param {Array} [config]      Optional array containing configuration objects
+ *                             for transports.
+ * @constructor
+ */
+function TransportManager(config) {
+  this.transports = [];
+
+  if (config) {
+    this.load(config);
+  }
+}
+
+// map with all registered types of transports
+// each transport must register itself at the TransportManager using registerType.
+TransportManager.types = {};
+
+/**
+ * Register a new type of transport. This transport can then be loaded via
+ * configuration.
+ * @param {Transport.prototype} constructor     A transport constructor
+ */
+TransportManager.registerType = function (constructor) {
+  var type = constructor.prototype.type;
+  if (typeof constructor !== 'function') {
+    throw new Error('Constructor function expected');
+  }
+  if (!type) {
+    throw new Error('Field "prototype.type" missing in transport constructor');
+  }
+  if (type in TransportManager.types) {
+    if (TransportManager.types[type] !== constructor) {
+      throw new Error('Transport type "' + type + '" already exists');
+    }
+  }
+
+  TransportManager.types[type] = constructor;
+};
+
+/**
+ * Add a loaded transport to the manager
+ * @param {Transport} transport
+ * @return {Transport} returns the transport itself
+ */
+TransportManager.prototype.add = function (transport) {
+  this.transports.push(transport);
+  return transport;
+};
+
+/**
+ * Load one or multiple transports based on JSON configuration.
+ * New transports will be appended to current transports.
+ * @param {Object | Array} config
+ * @return {Transport | Transport[]} Returns the loaded transport(s)
+ */
+TransportManager.prototype.load = function (config) {
+  if (Array.isArray(config)) {
+    return config.map(this.load.bind(this));
+  }
+
+  var type = config.type;
+  if (!type) {
+    throw new Error('Property "type" missing');
+  }
+
+  var constructor = TransportManager.types[type];
+  if (!constructor) {
+    throw new Error('Unknown type of transport "' + type + '". ' +
+        'Choose from: ' + Object.keys(TransportManager.types).join(','))
+  }
+
+  var transport = new constructor(config);
+  this.transports.push(transport);
+  return transport;
+};
+
+/**
+ * Unload a transport.
+ * @param {Transport | Transport[] | string | string[]} transport
+ *              A Transport instance or the id of a transport, or an Array
+ *              with transports or transport ids.
+ */
+TransportManager.prototype.unload = function (transport) {
+  var _transport;
+  if (typeof transport === 'string') {
+    _transport = this.get(transport);
+  }
+  else if (Array.isArray(transport)) {
+    for (var i = 0; i < transport.length; i++) {
+      this.unload(transport[i]);
+    }
+  }
+  else {
+    _transport = transport;
+  }
+
+  if (_transport) {
+    _transport.close();
+
+    var index = this.transports.indexOf(_transport);
+    if (index !== -1) {
+      this.transports.splice(index, 1);
+    }
+  }
+};
+
+/**
+ * Get a transport by its id. The transport must have been created with an id
+ * @param {string} [id] The id of a transport
+ * @return {Transport} Returns the transport when found. Throws an error
+ *                     when not found.
+ */
+TransportManager.prototype.get = function (id) {
+  for (var i = 0; i < this.transports.length; i++) {
+    var transport = this.transports[i];
+    if (transport.id === id) {
+      return transport;
+    }
+  }
+
+  throw new Error('Transport with id "' + id + '" not found');
+};
+
+/**
+ * Get all transports.
+ * @return {Transport[]} Returns an array with all loaded transports.
+ */
+TransportManager.prototype.getAll = function () {
+  return this.transports.concat([]);
+};
+
+/**
+ * Find transports by type.
+ * @param {string} [type]   Type of the transport. Choose from 'amqp',
+ *                          'distribus', 'local', 'pubnub'.
+ * @return {Transport[]}    When type is defined, the all transports of this
+ *                          type are returned. When undefined, all transports
+ *                          are returned.
+ */
+TransportManager.prototype.getByType = function (type) {
+  if (type) {
+    if (!(type in TransportManager.types)) {
+      throw new Error('Unknown type of transport "' + type + '". ' +
+          'Choose from: ' + Object.keys(TransportManager.types).join(','))
+    }
+
+    return this.transports.filter(function (transport) {
+      return transport.type === type;
+    });
+  }
+  else {
+    return [].concat(this.transports);
+  }
+};
+
+/**
+ * Close all configured transports and remove them from the manager.
+ */
+TransportManager.prototype.clear = function () {
+  this.transports.forEach(function (transport) {
+    transport.close();
+  });
+  this.transports = [];
+};
+
+module.exports = TransportManager;
 
 },{}],5:[function(require,module,exports){
 'use strict';
 
-exports.decode = exports.parse = require('./decode');
-exports.encode = exports.stringify = require('./encode');
+var Promise = require('promise');
 
-},{"./decode":3,"./encode":4}],6:[function(require,module,exports){
+/**
+ * An abstract Transport connection
+ * @param {Transport} transport
+ * @param {string} id
+ * @param {function} receive
+ * @constructor
+ * @abstract
+ */
+function Connection (transport, id, receive) {
+  throw new Error('Cannot create an abstract Connection');
+}
+
+Connection.prototype.ready = Promise.reject(new Error('Cannot get abstract property ready'));
+
+/**
+ * Send a message to an agent.
+ * @param {string} to
+ * @param {*} message
+ * @return {Promise} returns a promise which resolves when the message has been sent
+ */
+Connection.prototype.send = function (to, message) {
+  throw new Error('Cannot call abstract function send');
+};
+
+/**
+ * Close the connection, disconnect from the transport.
+ */
+Connection.prototype.close = function () {
+  throw new Error('Cannot call abstract function "close"');
+};
+
+Connection.prototype.getMyUrl = function(){
+  return this.transport.type +":"+this.id;
+};
+
+module.exports = Connection;
+
+},{"promise":55}],6:[function(require,module,exports){
+'use strict';
+
+/**
+ * Abstract prototype of a transport
+ * @param {Object} [config]
+ * @constructor
+ */
+function Transport(config) {
+  this.id = config && config.id || null;
+  this['default'] = config && config['default'] || false;
+}
+
+Transport.prototype.type = null;
+
+/**
+ * Connect an agent
+ * @param {String} id
+ * @param {Function} receive  Invoked as receive(from, message)
+ * @return {Connection}       Returns a connection
+ */
+Transport.prototype.connect = function(id, receive) {
+  throw new Error('Cannot invoke abstract function "connect"');
+};
+
+/**
+ * Close the transport
+ */
+Transport.prototype.close = function() {
+  throw new Error('Cannot invoke abstract function "close"');
+};
+
+module.exports = Transport;
+
+},{}],7:[function(require,module,exports){
+'use strict';
+
+var Promise = require('promise');
+var Connection = require('../Connection');
+
+/**
+ * A local connection.
+ * @param {LocalTransport} transport
+ * @param {string | number} id
+ * @param {function} receive
+ * @constructor
+ */
+function LocalConnection(transport, id, receive) {
+  this.transport = transport;
+  this.id = id;
+
+  // register the agents receive function
+  if (this.id in this.transport.agents) {
+    throw new Error('Agent with id ' + id + ' already exists');
+  }
+  this.transport.agents[this.id] = receive;
+
+  // ready state
+  this.ready = Promise.resolve(this);
+}
+
+LocalConnection.prototype.getMyUrl = function(){
+  return this.transport.type +":"+this.id;
+};
+
+/**
+ * Send a message to an agent.
+ * @param {string} to
+ * @param {*} message
+ * @return {Promise} returns a promise which resolves when the message has been sent
+ */
+LocalConnection.prototype.send = function (to, message) {
+  var query = to.replace("local:","").split("?");
+  var callback = this.transport.agents[query[0]];
+  if (!callback) {
+    return Promise.reject(new Error('Agent with id ' + to + ' not found'));
+  }
+
+  var queryParams = query[1] ? query[1].split("&"):[];
+  // invoke the agents receiver as callback(from, message, queryparameters)
+  callback("local:"+this.id, message, queryParams);
+
+  return Promise.resolve();
+};
+
+/**
+ * Close the connection
+ */
+LocalConnection.prototype.close = function () {
+  delete this.transport.agents[this.id];
+};
+
+module.exports = LocalConnection;
+
+},{"../Connection":5,"promise":55}],8:[function(require,module,exports){
+'use strict';
+
+var Transport = require('./../Transport');
+var LocalConnection = require('./LocalConnection');
+
+/**
+ * Create a local transport.
+ * @param {Object} config         Config can contain the following properties:
+ *                                - `id: string`. Optional
+ * @constructor
+ */
+function LocalTransport(config) {
+  this.id = config && config.id || null;
+  this.networkId = this.id || null;
+  this['default'] = config && config['default'] || false;
+  this.agents = {};
+}
+
+LocalTransport.prototype = new Transport();
+
+LocalTransport.prototype.type = 'local';
+
+/**
+ * Connect an agent
+ * @param {String} id
+ * @param {Function} receive                  Invoked as receive(from, message)
+ * @return {LocalConnection} Returns a promise which resolves when
+ *                                                connected.
+ */
+LocalTransport.prototype.connect = function(id, receive) {
+  return new LocalConnection(this, id, receive);
+};
+
+/**
+ * Close the transport. Removes all agent connections.
+ */
+LocalTransport.prototype.close = function() {
+  this.agents = {};
+};
+
+module.exports = LocalTransport;
+
+},{"./../Transport":6,"./LocalConnection":7}],9:[function(require,module,exports){
+'use strict';
+
+/**
+ * Test whether the provided value is a Promise.
+ * A value is marked as a Promise when it is an object containing functions
+ * `then` and `catch`.
+ * @param {*} value
+ * @return {boolean} Returns true when `value` is a Promise
+ */
+exports.isPromise = function (value) {
+  return value &&
+      typeof value['then'] === 'function' &&
+      typeof value['catch'] === 'function'
+};
+
+/**
+ * Normalize a url. Removes trailing slash
+ * @param {string} url
+ * @return {string} Returns the normalized url
+ */
+exports.normalizeURL = function (url) {
+  if (url[url.length - 1] == '/') {
+    return url.substring(0, url.length - 1);
+  }
+  else {
+    return url;
+  }
+};
+
+},{}],10:[function(require,module,exports){
+"use strict";
+
+// rawAsap provides everything we need except exception management.
+var rawAsap = require("./raw");
+// RawTasks are recycled to reduce GC churn.
+var freeTasks = [];
+// We queue errors to ensure they are thrown in right order (FIFO).
+// Array-as-queue is good enough here, since we are just dealing with exceptions.
+var pendingErrors = [];
+var requestErrorThrow = rawAsap.makeRequestCallFromTimer(throwFirstError);
+
+function throwFirstError() {
+    if (pendingErrors.length) {
+        throw pendingErrors.shift();
+    }
+}
+
+/**
+ * Calls a task as soon as possible after returning, in its own event, with priority
+ * over other events like animation, reflow, and repaint. An error thrown from an
+ * event will not interrupt, nor even substantially slow down the processing of
+ * other events, but will be rather postponed to a lower priority event.
+ * @param {{call}} task A callable object, typically a function that takes no
+ * arguments.
+ */
+module.exports = asap;
+function asap(task) {
+    var rawTask;
+    if (freeTasks.length) {
+        rawTask = freeTasks.pop();
+    } else {
+        rawTask = new RawTask();
+    }
+    rawTask.task = task;
+    rawAsap(rawTask);
+}
+
+// We wrap tasks with recyclable task objects.  A task object implements
+// `call`, just like a function.
+function RawTask() {
+    this.task = null;
+}
+
+// The sole purpose of wrapping the task is to catch the exception and recycle
+// the task object after its single use.
+RawTask.prototype.call = function () {
+    try {
+        this.task.call();
+    } catch (error) {
+        if (asap.onerror) {
+            // This hook exists purely for testing purposes.
+            // Its name will be periodically randomized to break any code that
+            // depends on its existence.
+            asap.onerror(error);
+        } else {
+            // In a web browser, exceptions are not fatal. However, to avoid
+            // slowing down the queue of pending tasks, we rethrow the error in a
+            // lower priority turn.
+            pendingErrors.push(error);
+            requestErrorThrow();
+        }
+    } finally {
+        this.task = null;
+        freeTasks[freeTasks.length] = this;
+    }
+};
+
+},{"./raw":11}],11:[function(require,module,exports){
+(function (global){
+"use strict";
+
+// Use the fastest means possible to execute a task in its own turn, with
+// priority over other events including IO, animation, reflow, and redraw
+// events in browsers.
+//
+// An exception thrown by a task will permanently interrupt the processing of
+// subsequent tasks. The higher level `asap` function ensures that if an
+// exception is thrown by a task, that the task queue will continue flushing as
+// soon as possible, but if you use `rawAsap` directly, you are responsible to
+// either ensure that no exceptions are thrown from your task, or to manually
+// call `rawAsap.requestFlush` if an exception is thrown.
+module.exports = rawAsap;
+function rawAsap(task) {
+    if (!queue.length) {
+        requestFlush();
+        flushing = true;
+    }
+    // Equivalent to push, but avoids a function call.
+    queue[queue.length] = task;
+}
+
+var queue = [];
+// Once a flush has been requested, no further calls to `requestFlush` are
+// necessary until the next `flush` completes.
+var flushing = false;
+// `requestFlush` is an implementation-specific method that attempts to kick
+// off a `flush` event as quickly as possible. `flush` will attempt to exhaust
+// the event queue before yielding to the browser's own event loop.
+var requestFlush;
+// The position of the next task to execute in the task queue. This is
+// preserved between calls to `flush` so that it can be resumed if
+// a task throws an exception.
+var index = 0;
+// If a task schedules additional tasks recursively, the task queue can grow
+// unbounded. To prevent memory exhaustion, the task queue will periodically
+// truncate already-completed tasks.
+var capacity = 1024;
+
+// The flush function processes all tasks that have been scheduled with
+// `rawAsap` unless and until one of those tasks throws an exception.
+// If a task throws an exception, `flush` ensures that its state will remain
+// consistent and will resume where it left off when called again.
+// However, `flush` does not make any arrangements to be called again if an
+// exception is thrown.
+function flush() {
+    while (index < queue.length) {
+        var currentIndex = index;
+        // Advance the index before calling the task. This ensures that we will
+        // begin flushing on the next task the task throws an error.
+        index = index + 1;
+        queue[currentIndex].call();
+        // Prevent leaking memory for long chains of recursive calls to `asap`.
+        // If we call `asap` within tasks scheduled by `asap`, the queue will
+        // grow, but to avoid an O(n) walk for every task we execute, we don't
+        // shift tasks off the queue after they have been executed.
+        // Instead, we periodically shift 1024 tasks off the queue.
+        if (index > capacity) {
+            // Manually shift all values starting at the index back to the
+            // beginning of the queue.
+            for (var scan = 0, newLength = queue.length - index; scan < newLength; scan++) {
+                queue[scan] = queue[scan + index];
+            }
+            queue.length -= index;
+            index = 0;
+        }
+    }
+    queue.length = 0;
+    index = 0;
+    flushing = false;
+}
+
+// `requestFlush` is implemented using a strategy based on data collected from
+// every available SauceLabs Selenium web driver worker at time of writing.
+// https://docs.google.com/spreadsheets/d/1mG-5UYGup5qxGdEMWkhP6BWCz053NUb2E1QoUTU16uA/edit#gid=783724593
+
+// Safari 6 and 6.1 for desktop, iPad, and iPhone are the only browsers that
+// have WebKitMutationObserver but not un-prefixed MutationObserver.
+// Must use `global` or `self` instead of `window` to work in both frames and web
+// workers. `global` is a provision of Browserify, Mr, Mrs, or Mop.
+
+/* globals self */
+var scope = typeof global !== "undefined" ? global : self;
+var BrowserMutationObserver = scope.MutationObserver || scope.WebKitMutationObserver;
+
+// MutationObservers are desirable because they have high priority and work
+// reliably everywhere they are implemented.
+// They are implemented in all modern browsers.
+//
+// - Android 4-4.3
+// - Chrome 26-34
+// - Firefox 14-29
+// - Internet Explorer 11
+// - iPad Safari 6-7.1
+// - iPhone Safari 7-7.1
+// - Safari 6-7
+if (typeof BrowserMutationObserver === "function") {
+    requestFlush = makeRequestCallFromMutationObserver(flush);
+
+// MessageChannels are desirable because they give direct access to the HTML
+// task queue, are implemented in Internet Explorer 10, Safari 5.0-1, and Opera
+// 11-12, and in web workers in many engines.
+// Although message channels yield to any queued rendering and IO tasks, they
+// would be better than imposing the 4ms delay of timers.
+// However, they do not work reliably in Internet Explorer or Safari.
+
+// Internet Explorer 10 is the only browser that has setImmediate but does
+// not have MutationObservers.
+// Although setImmediate yields to the browser's renderer, it would be
+// preferrable to falling back to setTimeout since it does not have
+// the minimum 4ms penalty.
+// Unfortunately there appears to be a bug in Internet Explorer 10 Mobile (and
+// Desktop to a lesser extent) that renders both setImmediate and
+// MessageChannel useless for the purposes of ASAP.
+// https://github.com/kriskowal/q/issues/396
+
+// Timers are implemented universally.
+// We fall back to timers in workers in most engines, and in foreground
+// contexts in the following browsers.
+// However, note that even this simple case requires nuances to operate in a
+// broad spectrum of browsers.
+//
+// - Firefox 3-13
+// - Internet Explorer 6-9
+// - iPad Safari 4.3
+// - Lynx 2.8.7
+} else {
+    requestFlush = makeRequestCallFromTimer(flush);
+}
+
+// `requestFlush` requests that the high priority event queue be flushed as
+// soon as possible.
+// This is useful to prevent an error thrown in a task from stalling the event
+// queue if the exception handled by Node.js’s
+// `process.on("uncaughtException")` or by a domain.
+rawAsap.requestFlush = requestFlush;
+
+// To request a high priority event, we induce a mutation observer by toggling
+// the text of a text node between "1" and "-1".
+function makeRequestCallFromMutationObserver(callback) {
+    var toggle = 1;
+    var observer = new BrowserMutationObserver(callback);
+    var node = document.createTextNode("");
+    observer.observe(node, {characterData: true});
+    return function requestCall() {
+        toggle = -toggle;
+        node.data = toggle;
+    };
+}
+
+// The message channel technique was discovered by Malte Ubl and was the
+// original foundation for this library.
+// http://www.nonblocking.io/2011/06/windownexttick.html
+
+// Safari 6.0.5 (at least) intermittently fails to create message ports on a
+// page's first load. Thankfully, this version of Safari supports
+// MutationObservers, so we don't need to fall back in that case.
+
+// function makeRequestCallFromMessageChannel(callback) {
+//     var channel = new MessageChannel();
+//     channel.port1.onmessage = callback;
+//     return function requestCall() {
+//         channel.port2.postMessage(0);
+//     };
+// }
+
+// For reasons explained above, we are also unable to use `setImmediate`
+// under any circumstances.
+// Even if we were, there is another bug in Internet Explorer 10.
+// It is not sufficient to assign `setImmediate` to `requestFlush` because
+// `setImmediate` must be called *by name* and therefore must be wrapped in a
+// closure.
+// Never forget.
+
+// function makeRequestCallFromSetImmediate(callback) {
+//     return function requestCall() {
+//         setImmediate(callback);
+//     };
+// }
+
+// Safari 6.0 has a problem where timers will get lost while the user is
+// scrolling. This problem does not impact ASAP because Safari 6.0 supports
+// mutation observers, so that implementation is used instead.
+// However, if we ever elect to use timers in Safari, the prevalent work-around
+// is to add a scroll event listener that calls for a flush.
+
+// `setTimeout` does not call the passed callback if the delay is less than
+// approximately 7 in web workers in Firefox 8 through 18, and sometimes not
+// even then.
+
+function makeRequestCallFromTimer(callback) {
+    return function requestCall() {
+        // We dispatch a timeout with a specified delay of 0 for engines that
+        // can reliably accommodate that request. This will usually be snapped
+        // to a 4 milisecond delay, but once we're flushing, there's no delay
+        // between events.
+        var timeoutHandle = setTimeout(handleTimer, 0);
+        // However, since this timer gets frequently dropped in Firefox
+        // workers, we enlist an interval handle that will try to fire
+        // an event 20 times per second until it succeeds.
+        var intervalHandle = setInterval(handleTimer, 50);
+
+        function handleTimer() {
+            // Whichever timer succeeds will cancel both timers and
+            // execute the callback.
+            clearTimeout(timeoutHandle);
+            clearInterval(intervalHandle);
+            callback();
+        }
+    };
+}
+
+// This is for `asap.js` only.
+// Its name will be periodically randomized to break any code that depends on
+// its existence.
+rawAsap.makeRequestCallFromTimer = makeRequestCallFromTimer;
+
+// ASAP was originally a nextTick shim included in Q. This was factored out
+// into this ASAP package. It was later adapted to RSVP which made further
+// amendments. These decisions, particularly to marginalize MessageChannel and
+// to capture the MutationObserver implementation in a closure, were integrated
+// back into ASAP proper.
+// https://github.com/tildeio/rsvp.js/blob/cddf7232546a9cf858524b75cde6f9edf72620a7/lib/rsvp/asap.js
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],12:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -1634,7 +1966,7 @@ Url.prototype.parseHost = function() {
   if (host) this.hostname = host;
 };
 
-},{"./util":7,"punycode":2,"querystring":5}],7:[function(require,module,exports){
+},{"./util":13,"punycode":63,"querystring":66}],13:[function(require,module,exports){
 'use strict';
 
 module.exports = {
@@ -1652,1252 +1984,18 @@ module.exports = {
   }
 };
 
-},{}],8:[function(require,module,exports){
-exports.Agent = require('./lib/Agent');
-exports.ServiceManager = require('./lib/ServiceManager');
-exports.TransportManager = require('./lib/TransportManager');
-
-exports.transport = {
-  LocalTransport:     require('./lib/transport/local/LocalTransport')
-};
-
-exports.TransportManager.registerType(exports.transport.LocalTransport);
-
-// load the default ServiceManager, a singleton, initialized with a LocalTransport
-exports.system = new exports.ServiceManager();
-exports.system.transports.add(new exports.transport.LocalTransport());
-
-// override Agent.getTransportById in order to support Agent.connect(transportId)
-exports.Agent.getTransportById = function (id) {
-  return exports.system.transports.get(id);
-};
-
-},{"./lib/Agent":9,"./lib/ServiceManager":10,"./lib/TransportManager":11,"./lib/transport/local/LocalTransport":15}],9:[function(require,module,exports){
-'use strict';
-
-var Promise = require('promise');
-var uuid = require('uuid-v4');
-var util = require('./util');
-var URL = require('url');
-
-/**
- * Agent
- * @param {string} [id]         Id for the agent. If not provided, the agent
- *                              will be given a uuid.
- * @constructor
- */
-function Agent(id) {
-  this.id = id ? id.toString() : uuid();
-
-  // a list with all connected transports
-  this.connections = [];
-  this.defaultConnection = null;
-  this.ready = Promise.resolve([]);
-}
-
-// an object with modules which can be used to extend the agent
-Agent.modules = {};
-
-/**
- * Register a new type of module. This module can then be loaded via
- * Agent.extend() and Agent.loadModule().
- * @param {Function} constructor     A module constructor
- */
-Agent.registerModule = function (constructor) {
-  var type = constructor.prototype.type;
-  if (typeof constructor !== 'function') {
-    throw new Error('Constructor function expected');
-  }
-  if (!type) {
-    throw new Error('Field "prototype.type" missing in transport constructor');
-  }
-  if (type in Agent.modules) {
-    if (Agent.modules[type] !== constructor) {
-      throw new Error('Module of type "' + type + '" already exists');
-    }
-  }
-
-  Agent.modules[type] = constructor;
-};
-
-/**
- * Get a transport by id.
- * This static method can be overloaded for example by the get function of
- * a singleton TransportManager.
- * @param {string} id
- * @return {Transport}
- */
-Agent.getTransportById = function (id) {
-  throw new Error('Transport with id "' + id + '" not found');
-};
-
-/**
- * Extend an agent with modules (mixins).
- * The modules new functions are added to the Agent itself.
- * See also function `loadModule`.
- * @param {string | string[]} module  A module name or an Array with module
- *                                    names. Available modules:
- *                                    'pattern', 'request', 'babble'
- * @param {Object} [options]          Additional options for loading the module
- * @return {Agent} Returns the agent itself
- */
-Agent.prototype.extend = function (module, options) {
-  if (Array.isArray(module)) {
-    var modules = [].concat(module);
-
-    // order the modules such that 'pattern' comes first, this module must be
-    // loaded before other modules ('request' specifically)
-    modules.sort(function (a, b) {
-      if (a == 'pattern') return -1;
-      if (b == 'pattern') return 1;
-      return 0;
-    });
-
-    // an array with module names
-    for (var i = 0; i < modules.length; i++) {
-      this.extend(modules[i], options)
-    }
-  }
-  else {
-    // a single module name
-    var constructor = _getModuleConstructor(module);
-    var instance = new constructor(this, options);
-    var mixin = instance.mixin();
-
-    // check for conflicts in the modules mixin functions
-    var me = this;
-    Object.keys(mixin).forEach(function (name) {
-      if (me[name] !== undefined && name !== '_receive') {
-        throw new Error('Conflict: agent already has a property "' + prop + '"');
-      }
-    });
-
-    // extend the agent with all mixin functions provided by the module
-    Object.keys(mixin).forEach(function (name) {
-      me[name] = mixin[name];
-    });
-  }
-
-  return this;
-};
-
-/**
- * Load a module onto an agent.
- * See also function `extend`.
- * @param {string | string[]} module  A module name or an Array with module
- *                                    names. Available modules:
- *                                    'pattern', 'request', 'babble'
- * @param {Object} [options]          Additional options for loading the module
- * @return {Object} Returns the created module
- */
-Agent.prototype.loadModule = function (module, options, additionalOptions) {
-  var _options = options !== undefined ? Object.create(options) : {};
-  _options.extend = false;
-
-  var constructor = _getModuleConstructor(module);
-  var instance = new constructor(this, options, additionalOptions);
-  var mixin = instance.mixin();
-
-  // only replace the _receive function, do not add other mixin functions
-  this._receive = mixin._receive;
-
-  return instance;
-};
-
-/**
- * Get a module constructor by it's name.
- * Throws an error when the module is not found.
- * @param {string} name
- * @return {function} Returns the modules constructor function
- * @private
- */
-function _getModuleConstructor(name) {
-  var constructor = Agent.modules[name];
-  if (!constructor) {
-    throw new Error('Unknown module "' + name + '". ' +
-      'Choose from: ' + Object.keys(Agent.modules).map(JSON.stringify).join(', '));
-  }
-  return constructor;
-}
-
-/**
- * Send a message to an agent
- * @param {string} to
- *              to is either:
- *              - A string "agentId", the id of the recipient. Will be send
- *                via the default transport or when there is no default
- *                transport via the first connected transport.
- *              - A string "agentId@transportId" Only usable locally, not
- *                for sharing an address with remote agents.
- *              - A string "protocol://networkId/agentId". This is a sharable
- *                identifier for an agent.
- * @param {*} message  Message to be send
- * @return {Promise} Returns a promise which resolves when the message as
- *                   successfully been sent, or rejected when sending the
- *                   message failed
- */
-Agent.prototype.send = function (to, message) {
-
-  var colon = to.indexOf(':');
-  if (colon !== -1) {
-    var url = URL.parse(to);
-
-    //TODO: Fix this for protocols that use networkId instead of host (Needs to be fixed in the protocol itself.)
-    return this._sendByProtocol(url.protocol.slice(0, -1), to, message);
-  }
-
-  // TODO: deprecate this notation "agentId@transportId"?
-  var at = to.indexOf('@');
-  if (at != -1) {
-    // to is an id like "agentId@transportId"
-    var _to = to.substring(0, at);
-    var _transportId = to.substring(at + 1);
-    return this._sendByTransportId(_transportId, _to, message);
-  }
-
-  // to is an id like "agentId". Send via the default transport
-  var conn = this.defaultConnection;
-  if (conn) {
-    return conn.send(to, message);
-  }
-  else {
-    return Promise.reject(new Error('No transport found'));
-  }
-};
-
-/**
- * Send a transport to an agent given a networkId
- * @param {string} networkId    A network id
- * @param {string} to           An agents id
- * @param {string} message      Message to be send
- * @return {Promise} Returns a promise which resolves when the message as
- *                   successfully been sent, or rejected when sending the
- *                   message failed
- * @private
- */
-Agent.prototype._sendByNetworkId = function (networkId, to, message) {
-  // TODO: change this.connections to a map with networkId as keys, much faster
-  for (var i = 0; i < this.connections.length; i++) {
-    var connection = this.connections[i];
-    if (connection.transport.networkId == networkId) {
-      return connection.send(to, message);
-    }
-  }
-
-  return Promise.reject(new Error('No transport found with networkId "' + networkId + '"'));
-};
-
-/**
- * Send a message by a transport by protocol.
- * The message will be send via the first found transport having the specified
- * protocol.
- * @param {string} protocol     A protocol, for example 'http' or 'ws'
- * @param {string} to           An agents id
- * @param {string} message      Message to be send
- * @return {Promise} Returns a promise which resolves when the message as
- *                   successfully been sent, or rejected when sending the
- *                   message failed
- * @private
- */
-Agent.prototype._sendByProtocol = function (protocol, to, message) {
-
-  // the https addresses also make use of the http protocol.
-  protocol = protocol == 'https' ? 'http' : protocol;
-
-  for (var i = 0; i < this.connections.length; i++) {
-    var connection = this.connections[i];
-    if (connection.transport.type == protocol) {
-      return connection.send(to, message);
-    }
-  }
-
-  return Promise.reject(new Error('No transport found for protocol "' + protocol + '"'));
-};
-
-/**
- * Send a transport to an agent via a specific transport
- * @param {string} transportId  The configured id of a transport.
- * @param {string} to           An agents id
- * @param {string} message      Message to be send
- * @return {Promise} Returns a promise which resolves when the message as
- *                   successfully been sent, or rejected when sending the
- *                   message failed
- * @private
- */
-Agent.prototype._sendByTransportId = function (transportId, to, message) {
-  for (var i = 0; i < this.connections.length; i++) {
-    var connection = this.connections[i];
-    if (connection.transport.id == transportId) {
-      return connection.send(to, message);
-    }
-  }
-
-  return Promise.reject(new Error('No transport found with id "' + transportId + '"'));
-};
-
-/**
- * Receive a message.
- * @param {string} from     Id of sender
- * @param {*} message       Received message, a JSON object (often a string)
- */
-Agent.prototype.receive = function (from, message, oobParams) {
-  // ... to be overloaded
-};
-
-/**
- * The method _receive is overloaded in a cascaded way by modules, and calls
- * the public method Agent.receive at the end of the chain.
- * @param {string} from     Id of sender
- * @param {*} message       Received message, a JSON object (often a string)
- * @param {array} oobParams Optional Out of Band parameters, e.g. query params for http
- * @returns {*} Returns the return value of Agent.receive
- * @private
- */
-Agent.prototype._receive = function (from, message, oobParams) {
-  return this.receive(from, message);
-};
-
-Agent.prototype.getUrls = function () {
-  return this.connections.map(function (connection) {
-    return connection.getMyUrl()
-  });
-};
-
-Agent.prototype.getUrlByProtocol = function (protocol) {
-  for (var i = 0; i < this.connections.length; i++) {
-    var connection = this.connections[i];
-    if (connection.transport.type == protocol) {
-      return connection.getMyUrl();
-    }
-  }
-};
-
-/**
- * Connect to a transport. The agent will subscribe itself to
- * messages sent to his id.
- * @param {string | Transport | Transport[] | string[]} transport
- *                                  A Transport instance, or the id of a
- *                                  transport loaded in eve.system.
- * @param {string} [id]             An optional alternative id to be used
- *                                  for the connection. By default, the agents
- *                                  own id is used.
- * @return {Connection | Connection[]}  Returns a connection or, in case of
- *                                      multiple transports, returns an
- *                                      array with connections. The connections
- *                                      have a promise .ready which resolves
- *                                      as soon as the connection is ready for
- *                                      use.
- */
-Agent.prototype.connect = function (transport, id) {
-  if (Array.isArray(transport)) {
-    var me = this;
-    return transport.map(function (_transport) {
-        try {
-          return me._connect(_transport, id);
-        } catch (e) {
-          return {error: e}
-        }
-      }
-    );
-  }
-  else if (typeof transport === 'string') {
-    // get transport by id
-    try {
-      return this._connect(Agent.getTransportById(transport), id);
-    } catch (e) {
-      return {error: e}
-    }
-  }
-  else {
-    // a transport instance
-    try {
-      return this._connect(transport, id);
-    } catch (e) {
-      return {error: e}
-    }
-  }
-};
-
-/**
- * Connect to a transport
- * @param {Transport} transport     A Transport instance
- * @param {string} [id]             An optional alternative id to be used
- *                                  for the connection. By default, the agents
- *                                  own id is used.
- * @return {Connection}             Returns a connection.
- * @private
- */
-Agent.prototype._connect = function (transport, id) {
-  // create a receive function which is bound to the _receive function.
-  // the _receive function can be replaced in by modules in a cascaded way,
-  // and in the end calls this.receive of the agent.
-  // note: we don't do receive = this._receive.bind(this) as the _receive
-  //       function can be overloaded after a connection is made.
-  var me = this;
-  var receive = function (from, message, oobParams) {
-    return me._receive(from, message, oobParams);
-  };
-  var connection = transport.connect(id || this.id, receive);
-  this.connections.push(connection);
-
-  // set or replace the defaultConnection
-  if (!this.defaultConnection) {
-    this.defaultConnection = connection;
-  }
-  else if (transport['default']) {
-    if (this.defaultConnection['default']) {
-      throw new Error('Cannot connect to a second default transport');
-    }
-    this.defaultConnection = connection;
-  }
-
-  this._updateReady();
-
-  return connection;
-};
-
-/**
- * Disconnect from one or multiple transports
- * @param {string | Transport | string[] | Transport[]} [transport]
- *              A transport or an array with transports.
- *              parameter transport can be an instance of a Transport, or the
- *              id of a transport.
- *              When transport is undefined, the agent will be disconnected
- *              from all connected transports.
- */
-Agent.prototype.disconnect = function (transport) {
-  var i, connection;
-
-  if (!transport) {
-    // disconnect all transports
-    while (connection = this.connections[0]) {
-      this._disconnect(connection);
-    }
-  }
-  else if (Array.isArray(transport)) {
-    // an array with transports
-    i = 0;
-    while (i < this.connections.length) {
-      connection = this.connections[i];
-      if (transport.indexOf(connection.transport) !== -1) {
-        this._disconnect(connection);
-      }
-      else {
-        i++;
-      }
-    }
-  }
-  else if (typeof transport === 'string') {
-    // transport by id
-    this.disconnect(Agent.getTransportById(transport));
-  }
-  else {
-    // a single transport
-    for (i = 0; i < this.connections.length; i++) {
-      connection = this.connections[i];
-      if (connection.transport === transport) {
-        this._disconnect(connection);
-        break;
-      }
-    }
-  }
-};
-
-/**
- * Close a connection
- * @param {Connection} connection
- * @private
- */
-Agent.prototype._disconnect = function (connection) {
-  // find the connection
-  var index = this.connections.indexOf(connection);
-  if (index !== -1) {
-    // close the connection
-    connection.close();
-
-    // remove from the list with connections
-    this.connections.splice(index, 1);
-
-    // replace the defaultConnection if needed
-    if (this.defaultConnection === connection) {
-      this.defaultConnection = this.connections[this.connections.length - 1] || null;
-    }
-  }
-
-  this._updateReady();
-};
-
-/**
- * Update the ready state of the agent
- * @private
- */
-Agent.prototype._updateReady = function () {
-  // FIXME: we should not replace with a new Promise,
-  //        we have a problem when this.ready is requested before ready,
-  //        and another connection is opened before ready
-  this.ready = Promise.all(this.connections.map(function (connection) {
-    return connection.ready;
-  }));
-};
-
-module.exports = Agent;
-
-},{"./util":16,"promise":59,"url":6,"uuid-v4":68}],10:[function(require,module,exports){
-'use strict';
-
-var seed = require('seed-random');
-var hypertimer = require('hypertimer');
-var TransportManager = require('./TransportManager');
-
-// map with known configuration properties
-var KNOWN_PROPERTIES = {
-  transports: true,
-  timer: true,
-  random: true
-};
-
-function ServiceManager(config) {
-  this.transports = new TransportManager();
-
-  this.timer = hypertimer();
-
-  this.random = Math.random;
-
-  this.init(config);
-}
-
-/**
- * Initialize the service manager with services loaded from a configuration
- * object. All current services are unloaded and removed.
- * @param {Object} config
- */
-ServiceManager.prototype.init = function (config) {
-  this.transports.clear();
-
-  if (config) {
-    if (config.transports) {
-      this.transports.load(config.transports);
-    }
-
-    if (config.timer) {
-      this.timer.config(config.timer);
-    }
-
-    if (config.random) {
-      if (config.random.deterministic) {
-        var key = config.random.seed || 'random seed';
-        this.random = seed(key, config.random);
-      }
-      else {
-        this.random = Math.random;
-      }
-    }
-
-    for (var prop in config) {
-      if (config.hasOwnProperty(prop) && !KNOWN_PROPERTIES[prop]) {
-        // TODO: should log this warning via a configured logger
-        console.log('WARNING: Unknown configuration option "' + prop + '"')
-      }
-    }
-  }
-};
-
-/**
- * Clear all configured services
- */
-ServiceManager.prototype.clear = function () {
-  this.transports.clear();
-};
-
-module.exports = ServiceManager;
-
-},{"./TransportManager":11,"hypertimer":35,"seed-random":67}],11:[function(require,module,exports){
-'use strict';
-
-/**
- * A manager for loading and finding transports.
- * @param {Array} [config]      Optional array containing configuration objects
- *                             for transports.
- * @constructor
- */
-function TransportManager(config) {
-  this.transports = [];
-
-  if (config) {
-    this.load(config);
-  }
-}
-
-// map with all registered types of transports
-// each transport must register itself at the TransportManager using registerType.
-TransportManager.types = {};
-
-/**
- * Register a new type of transport. This transport can then be loaded via
- * configuration.
- * @param {Transport.prototype} constructor     A transport constructor
- */
-TransportManager.registerType = function (constructor) {
-  var type = constructor.prototype.type;
-  if (typeof constructor !== 'function') {
-    throw new Error('Constructor function expected');
-  }
-  if (!type) {
-    throw new Error('Field "prototype.type" missing in transport constructor');
-  }
-  if (type in TransportManager.types) {
-    if (TransportManager.types[type] !== constructor) {
-      throw new Error('Transport type "' + type + '" already exists');
-    }
-  }
-
-  TransportManager.types[type] = constructor;
-};
-
-/**
- * Add a loaded transport to the manager
- * @param {Transport} transport
- * @return {Transport} returns the transport itself
- */
-TransportManager.prototype.add = function (transport) {
-  this.transports.push(transport);
-  return transport;
-};
-
-/**
- * Load one or multiple transports based on JSON configuration.
- * New transports will be appended to current transports.
- * @param {Object | Array} config
- * @return {Transport | Transport[]} Returns the loaded transport(s)
- */
-TransportManager.prototype.load = function (config) {
-  if (Array.isArray(config)) {
-    return config.map(this.load.bind(this));
-  }
-
-  var type = config.type;
-  if (!type) {
-    throw new Error('Property "type" missing');
-  }
-
-  var constructor = TransportManager.types[type];
-  if (!constructor) {
-    throw new Error('Unknown type of transport "' + type + '". ' +
-        'Choose from: ' + Object.keys(TransportManager.types).join(','))
-  }
-
-  var transport = new constructor(config);
-  this.transports.push(transport);
-  return transport;
-};
-
-/**
- * Unload a transport.
- * @param {Transport | Transport[] | string | string[]} transport
- *              A Transport instance or the id of a transport, or an Array
- *              with transports or transport ids.
- */
-TransportManager.prototype.unload = function (transport) {
-  var _transport;
-  if (typeof transport === 'string') {
-    _transport = this.get(transport);
-  }
-  else if (Array.isArray(transport)) {
-    for (var i = 0; i < transport.length; i++) {
-      this.unload(transport[i]);
-    }
-  }
-  else {
-    _transport = transport;
-  }
-
-  if (_transport) {
-    _transport.close();
-
-    var index = this.transports.indexOf(_transport);
-    if (index !== -1) {
-      this.transports.splice(index, 1);
-    }
-  }
-};
-
-/**
- * Get a transport by its id. The transport must have been created with an id
- * @param {string} [id] The id of a transport
- * @return {Transport} Returns the transport when found. Throws an error
- *                     when not found.
- */
-TransportManager.prototype.get = function (id) {
-  for (var i = 0; i < this.transports.length; i++) {
-    var transport = this.transports[i];
-    if (transport.id === id) {
-      return transport;
-    }
-  }
-
-  throw new Error('Transport with id "' + id + '" not found');
-};
-
-/**
- * Get all transports.
- * @return {Transport[]} Returns an array with all loaded transports.
- */
-TransportManager.prototype.getAll = function () {
-  return this.transports.concat([]);
-};
-
-/**
- * Find transports by type.
- * @param {string} [type]   Type of the transport. Choose from 'amqp',
- *                          'distribus', 'local', 'pubnub'.
- * @return {Transport[]}    When type is defined, the all transports of this
- *                          type are returned. When undefined, all transports
- *                          are returned.
- */
-TransportManager.prototype.getByType = function (type) {
-  if (type) {
-    if (!(type in TransportManager.types)) {
-      throw new Error('Unknown type of transport "' + type + '". ' +
-          'Choose from: ' + Object.keys(TransportManager.types).join(','))
-    }
-
-    return this.transports.filter(function (transport) {
-      return transport.type === type;
-    });
-  }
-  else {
-    return [].concat(this.transports);
-  }
-};
-
-/**
- * Close all configured transports and remove them from the manager.
- */
-TransportManager.prototype.clear = function () {
-  this.transports.forEach(function (transport) {
-    transport.close();
-  });
-  this.transports = [];
-};
-
-module.exports = TransportManager;
-
-},{}],12:[function(require,module,exports){
-'use strict';
-
-var Promise = require('promise');
-
-/**
- * An abstract Transport connection
- * @param {Transport} transport
- * @param {string} id
- * @param {function} receive
- * @constructor
- * @abstract
- */
-function Connection (transport, id, receive) {
-  throw new Error('Cannot create an abstract Connection');
-}
-
-Connection.prototype.ready = Promise.reject(new Error('Cannot get abstract property ready'));
-
-/**
- * Send a message to an agent.
- * @param {string} to
- * @param {*} message
- * @return {Promise} returns a promise which resolves when the message has been sent
- */
-Connection.prototype.send = function (to, message) {
-  throw new Error('Cannot call abstract function send');
-};
-
-/**
- * Close the connection, disconnect from the transport.
- */
-Connection.prototype.close = function () {
-  throw new Error('Cannot call abstract function "close"');
-};
-
-Connection.prototype.getMyUrl = function(){
-  return this.transport.type +":"+this.id;
-};
-
-module.exports = Connection;
-
-},{"promise":59}],13:[function(require,module,exports){
-'use strict';
-
-/**
- * Abstract prototype of a transport
- * @param {Object} [config]
- * @constructor
- */
-function Transport(config) {
-  this.id = config && config.id || null;
-  this['default'] = config && config['default'] || false;
-}
-
-Transport.prototype.type = null;
-
-/**
- * Connect an agent
- * @param {String} id
- * @param {Function} receive  Invoked as receive(from, message)
- * @return {Connection}       Returns a connection
- */
-Transport.prototype.connect = function(id, receive) {
-  throw new Error('Cannot invoke abstract function "connect"');
-};
-
-/**
- * Close the transport
- */
-Transport.prototype.close = function() {
-  throw new Error('Cannot invoke abstract function "close"');
-};
-
-module.exports = Transport;
-
 },{}],14:[function(require,module,exports){
-'use strict';
-
-var Promise = require('promise');
-var Connection = require('../Connection');
-
-/**
- * A local connection.
- * @param {LocalTransport} transport
- * @param {string | number} id
- * @param {function} receive
- * @constructor
- */
-function LocalConnection(transport, id, receive) {
-  this.transport = transport;
-  this.id = id;
-
-  // register the agents receive function
-  if (this.id in this.transport.agents) {
-    throw new Error('Agent with id ' + id + ' already exists');
-  }
-  this.transport.agents[this.id] = receive;
-
-  // ready state
-  this.ready = Promise.resolve(this);
-}
-
-LocalConnection.prototype.getMyUrl = function(){
-  return this.transport.type +":"+this.id;
-};
-
-/**
- * Send a message to an agent.
- * @param {string} to
- * @param {*} message
- * @return {Promise} returns a promise which resolves when the message has been sent
- */
-LocalConnection.prototype.send = function (to, message) {
-  var query = to.replace("local:","").split("?");
-  var callback = this.transport.agents[query[0]];
-  if (!callback) {
-    return Promise.reject(new Error('Agent with id ' + to + ' not found'));
-  }
-
-  var queryParams = query[1] ? query[1].split("&"):[];
-  // invoke the agents receiver as callback(from, message, queryparameters)
-  callback("local:"+this.id, message, queryParams);
-
-  return Promise.resolve();
-};
-
-/**
- * Close the connection
- */
-LocalConnection.prototype.close = function () {
-  delete this.transport.agents[this.id];
-};
-
-module.exports = LocalConnection;
-
-},{"../Connection":12,"promise":59}],15:[function(require,module,exports){
-'use strict';
-
-var Transport = require('./../Transport');
-var LocalConnection = require('./LocalConnection');
-
-/**
- * Create a local transport.
- * @param {Object} config         Config can contain the following properties:
- *                                - `id: string`. Optional
- * @constructor
- */
-function LocalTransport(config) {
-  this.id = config && config.id || null;
-  this.networkId = this.id || null;
-  this['default'] = config && config['default'] || false;
-  this.agents = {};
-}
-
-LocalTransport.prototype = new Transport();
-
-LocalTransport.prototype.type = 'local';
-
-/**
- * Connect an agent
- * @param {String} id
- * @param {Function} receive                  Invoked as receive(from, message)
- * @return {LocalConnection} Returns a promise which resolves when
- *                                                connected.
- */
-LocalTransport.prototype.connect = function(id, receive) {
-  return new LocalConnection(this, id, receive);
-};
-
-/**
- * Close the transport. Removes all agent connections.
- */
-LocalTransport.prototype.close = function() {
-  this.agents = {};
-};
-
-module.exports = LocalTransport;
-
-},{"./../Transport":13,"./LocalConnection":14}],16:[function(require,module,exports){
-'use strict';
-
-/**
- * Test whether the provided value is a Promise.
- * A value is marked as a Promise when it is an object containing functions
- * `then` and `catch`.
- * @param {*} value
- * @return {boolean} Returns true when `value` is a Promise
- */
-exports.isPromise = function (value) {
-  return value &&
-      typeof value['then'] === 'function' &&
-      typeof value['catch'] === 'function'
-};
-
-/**
- * Normalize a url. Removes trailing slash
- * @param {string} url
- * @return {string} Returns the normalized url
- */
-exports.normalizeURL = function (url) {
-  if (url[url.length - 1] == '/') {
-    return url.substring(0, url.length - 1);
-  }
-  else {
-    return url;
-  }
-};
-
-},{}],17:[function(require,module,exports){
-"use strict";
-
-// rawAsap provides everything we need except exception management.
-var rawAsap = require("./raw");
-// RawTasks are recycled to reduce GC churn.
-var freeTasks = [];
-// We queue errors to ensure they are thrown in right order (FIFO).
-// Array-as-queue is good enough here, since we are just dealing with exceptions.
-var pendingErrors = [];
-var requestErrorThrow = rawAsap.makeRequestCallFromTimer(throwFirstError);
-
-function throwFirstError() {
-    if (pendingErrors.length) {
-        throw pendingErrors.shift();
-    }
-}
-
-/**
- * Calls a task as soon as possible after returning, in its own event, with priority
- * over other events like animation, reflow, and repaint. An error thrown from an
- * event will not interrupt, nor even substantially slow down the processing of
- * other events, but will be rather postponed to a lower priority event.
- * @param {{call}} task A callable object, typically a function that takes no
- * arguments.
- */
-module.exports = asap;
-function asap(task) {
-    var rawTask;
-    if (freeTasks.length) {
-        rawTask = freeTasks.pop();
-    } else {
-        rawTask = new RawTask();
-    }
-    rawTask.task = task;
-    rawAsap(rawTask);
-}
-
-// We wrap tasks with recyclable task objects.  A task object implements
-// `call`, just like a function.
-function RawTask() {
-    this.task = null;
-}
-
-// The sole purpose of wrapping the task is to catch the exception and recycle
-// the task object after its single use.
-RawTask.prototype.call = function () {
-    try {
-        this.task.call();
-    } catch (error) {
-        if (asap.onerror) {
-            // This hook exists purely for testing purposes.
-            // Its name will be periodically randomized to break any code that
-            // depends on its existence.
-            asap.onerror(error);
-        } else {
-            // In a web browser, exceptions are not fatal. However, to avoid
-            // slowing down the queue of pending tasks, we rethrow the error in a
-            // lower priority turn.
-            pendingErrors.push(error);
-            requestErrorThrow();
-        }
-    } finally {
-        this.task = null;
-        freeTasks[freeTasks.length] = this;
-    }
-};
-
-},{"./raw":18}],18:[function(require,module,exports){
-(function (global){
-"use strict";
-
-// Use the fastest means possible to execute a task in its own turn, with
-// priority over other events including IO, animation, reflow, and redraw
-// events in browsers.
-//
-// An exception thrown by a task will permanently interrupt the processing of
-// subsequent tasks. The higher level `asap` function ensures that if an
-// exception is thrown by a task, that the task queue will continue flushing as
-// soon as possible, but if you use `rawAsap` directly, you are responsible to
-// either ensure that no exceptions are thrown from your task, or to manually
-// call `rawAsap.requestFlush` if an exception is thrown.
-module.exports = rawAsap;
-function rawAsap(task) {
-    if (!queue.length) {
-        requestFlush();
-        flushing = true;
-    }
-    // Equivalent to push, but avoids a function call.
-    queue[queue.length] = task;
-}
-
-var queue = [];
-// Once a flush has been requested, no further calls to `requestFlush` are
-// necessary until the next `flush` completes.
-var flushing = false;
-// `requestFlush` is an implementation-specific method that attempts to kick
-// off a `flush` event as quickly as possible. `flush` will attempt to exhaust
-// the event queue before yielding to the browser's own event loop.
-var requestFlush;
-// The position of the next task to execute in the task queue. This is
-// preserved between calls to `flush` so that it can be resumed if
-// a task throws an exception.
-var index = 0;
-// If a task schedules additional tasks recursively, the task queue can grow
-// unbounded. To prevent memory exhaustion, the task queue will periodically
-// truncate already-completed tasks.
-var capacity = 1024;
-
-// The flush function processes all tasks that have been scheduled with
-// `rawAsap` unless and until one of those tasks throws an exception.
-// If a task throws an exception, `flush` ensures that its state will remain
-// consistent and will resume where it left off when called again.
-// However, `flush` does not make any arrangements to be called again if an
-// exception is thrown.
-function flush() {
-    while (index < queue.length) {
-        var currentIndex = index;
-        // Advance the index before calling the task. This ensures that we will
-        // begin flushing on the next task the task throws an error.
-        index = index + 1;
-        queue[currentIndex].call();
-        // Prevent leaking memory for long chains of recursive calls to `asap`.
-        // If we call `asap` within tasks scheduled by `asap`, the queue will
-        // grow, but to avoid an O(n) walk for every task we execute, we don't
-        // shift tasks off the queue after they have been executed.
-        // Instead, we periodically shift 1024 tasks off the queue.
-        if (index > capacity) {
-            // Manually shift all values starting at the index back to the
-            // beginning of the queue.
-            for (var scan = 0, newLength = queue.length - index; scan < newLength; scan++) {
-                queue[scan] = queue[scan + index];
-            }
-            queue.length -= index;
-            index = 0;
-        }
-    }
-    queue.length = 0;
-    index = 0;
-    flushing = false;
-}
-
-// `requestFlush` is implemented using a strategy based on data collected from
-// every available SauceLabs Selenium web driver worker at time of writing.
-// https://docs.google.com/spreadsheets/d/1mG-5UYGup5qxGdEMWkhP6BWCz053NUb2E1QoUTU16uA/edit#gid=783724593
-
-// Safari 6 and 6.1 for desktop, iPad, and iPhone are the only browsers that
-// have WebKitMutationObserver but not un-prefixed MutationObserver.
-// Must use `global` or `self` instead of `window` to work in both frames and web
-// workers. `global` is a provision of Browserify, Mr, Mrs, or Mop.
-
-/* globals self */
-var scope = typeof global !== "undefined" ? global : self;
-var BrowserMutationObserver = scope.MutationObserver || scope.WebKitMutationObserver;
-
-// MutationObservers are desirable because they have high priority and work
-// reliably everywhere they are implemented.
-// They are implemented in all modern browsers.
-//
-// - Android 4-4.3
-// - Chrome 26-34
-// - Firefox 14-29
-// - Internet Explorer 11
-// - iPad Safari 6-7.1
-// - iPhone Safari 7-7.1
-// - Safari 6-7
-if (typeof BrowserMutationObserver === "function") {
-    requestFlush = makeRequestCallFromMutationObserver(flush);
-
-// MessageChannels are desirable because they give direct access to the HTML
-// task queue, are implemented in Internet Explorer 10, Safari 5.0-1, and Opera
-// 11-12, and in web workers in many engines.
-// Although message channels yield to any queued rendering and IO tasks, they
-// would be better than imposing the 4ms delay of timers.
-// However, they do not work reliably in Internet Explorer or Safari.
-
-// Internet Explorer 10 is the only browser that has setImmediate but does
-// not have MutationObservers.
-// Although setImmediate yields to the browser's renderer, it would be
-// preferrable to falling back to setTimeout since it does not have
-// the minimum 4ms penalty.
-// Unfortunately there appears to be a bug in Internet Explorer 10 Mobile (and
-// Desktop to a lesser extent) that renders both setImmediate and
-// MessageChannel useless for the purposes of ASAP.
-// https://github.com/kriskowal/q/issues/396
-
-// Timers are implemented universally.
-// We fall back to timers in workers in most engines, and in foreground
-// contexts in the following browsers.
-// However, note that even this simple case requires nuances to operate in a
-// broad spectrum of browsers.
-//
-// - Firefox 3-13
-// - Internet Explorer 6-9
-// - iPad Safari 4.3
-// - Lynx 2.8.7
-} else {
-    requestFlush = makeRequestCallFromTimer(flush);
-}
-
-// `requestFlush` requests that the high priority event queue be flushed as
-// soon as possible.
-// This is useful to prevent an error thrown in a task from stalling the event
-// queue if the exception handled by Node.js’s
-// `process.on("uncaughtException")` or by a domain.
-rawAsap.requestFlush = requestFlush;
-
-// To request a high priority event, we induce a mutation observer by toggling
-// the text of a text node between "1" and "-1".
-function makeRequestCallFromMutationObserver(callback) {
-    var toggle = 1;
-    var observer = new BrowserMutationObserver(callback);
-    var node = document.createTextNode("");
-    observer.observe(node, {characterData: true});
-    return function requestCall() {
-        toggle = -toggle;
-        node.data = toggle;
-    };
-}
-
-// The message channel technique was discovered by Malte Ubl and was the
-// original foundation for this library.
-// http://www.nonblocking.io/2011/06/windownexttick.html
-
-// Safari 6.0.5 (at least) intermittently fails to create message ports on a
-// page's first load. Thankfully, this version of Safari supports
-// MutationObservers, so we don't need to fall back in that case.
-
-// function makeRequestCallFromMessageChannel(callback) {
-//     var channel = new MessageChannel();
-//     channel.port1.onmessage = callback;
-//     return function requestCall() {
-//         channel.port2.postMessage(0);
-//     };
-// }
-
-// For reasons explained above, we are also unable to use `setImmediate`
-// under any circumstances.
-// Even if we were, there is another bug in Internet Explorer 10.
-// It is not sufficient to assign `setImmediate` to `requestFlush` because
-// `setImmediate` must be called *by name* and therefore must be wrapped in a
-// closure.
-// Never forget.
-
-// function makeRequestCallFromSetImmediate(callback) {
-//     return function requestCall() {
-//         setImmediate(callback);
-//     };
-// }
-
-// Safari 6.0 has a problem where timers will get lost while the user is
-// scrolling. This problem does not impact ASAP because Safari 6.0 supports
-// mutation observers, so that implementation is used instead.
-// However, if we ever elect to use timers in Safari, the prevalent work-around
-// is to add a scroll event listener that calls for a flush.
-
-// `setTimeout` does not call the passed callback if the delay is less than
-// approximately 7 in web workers in Firefox 8 through 18, and sometimes not
-// even then.
-
-function makeRequestCallFromTimer(callback) {
-    return function requestCall() {
-        // We dispatch a timeout with a specified delay of 0 for engines that
-        // can reliably accommodate that request. This will usually be snapped
-        // to a 4 milisecond delay, but once we're flushing, there's no delay
-        // between events.
-        var timeoutHandle = setTimeout(handleTimer, 0);
-        // However, since this timer gets frequently dropped in Firefox
-        // workers, we enlist an interval handle that will try to fire
-        // an event 20 times per second until it succeeds.
-        var intervalHandle = setInterval(handleTimer, 50);
-
-        function handleTimer() {
-            // Whichever timer succeeds will cancel both timers and
-            // execute the callback.
-            clearTimeout(timeoutHandle);
-            clearInterval(intervalHandle);
-            callback();
-        }
-    };
-}
-
-// This is for `asap.js` only.
-// Its name will be periodically randomized to break any code that depends on
-// its existence.
-rawAsap.makeRequestCallFromTimer = makeRequestCallFromTimer;
-
-// ASAP was originally a nextTick shim included in Q. This was factored out
-// into this ASAP package. It was later adapted to RSVP which made further
-// amendments. These decisions, particularly to marginalize MessageChannel and
-// to capture the MutationObserver implementation in a closure, were integrated
-// back into ASAP proper.
-// https://github.com/tildeio/rsvp.js/blob/cddf7232546a9cf858524b75cde6f9edf72620a7/lib/rsvp/asap.js
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],19:[function(require,module,exports){
 "use strict";
 
 // eslint-disable-next-line no-empty-function
 module.exports = function () {};
 
-},{}],20:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 "use strict";
 
 module.exports = require("./is-implemented")() ? Object.assign : require("./shim");
 
-},{"./is-implemented":21,"./shim":22}],21:[function(require,module,exports){
+},{"./is-implemented":16,"./shim":17}],16:[function(require,module,exports){
 "use strict";
 
 module.exports = function () {
@@ -2908,7 +2006,7 @@ module.exports = function () {
 	return obj.foo + obj.bar + obj.trzy === "razdwatrzy";
 };
 
-},{}],22:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 "use strict";
 
 var keys  = require("../keys")
@@ -2933,14 +2031,14 @@ module.exports = function (dest, src/*, …srcn*/) {
 	return dest;
 };
 
-},{"../keys":26,"../valid-value":31}],23:[function(require,module,exports){
+},{"../keys":21,"../valid-value":26}],18:[function(require,module,exports){
 // Deprecated
 
 "use strict";
 
 module.exports = function (obj) { return typeof obj === "function"; };
 
-},{}],24:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 "use strict";
 
 var value                   = require("./valid-value")
@@ -2956,19 +2054,19 @@ module.exports = function (obj) {
 	return true;
 };
 
-},{"./valid-value":31}],25:[function(require,module,exports){
+},{"./valid-value":26}],20:[function(require,module,exports){
 "use strict";
 
 var _undefined = require("../function/noop")(); // Support ES3 engines
 
 module.exports = function (val) { return val !== _undefined && val !== null; };
 
-},{"../function/noop":19}],26:[function(require,module,exports){
+},{"../function/noop":14}],21:[function(require,module,exports){
 "use strict";
 
 module.exports = require("./is-implemented")() ? Object.keys : require("./shim");
 
-},{"./is-implemented":27,"./shim":28}],27:[function(require,module,exports){
+},{"./is-implemented":22,"./shim":23}],22:[function(require,module,exports){
 "use strict";
 
 module.exports = function () {
@@ -2980,7 +2078,7 @@ module.exports = function () {
 	}
 };
 
-},{}],28:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 "use strict";
 
 var isValue = require("../is-value");
@@ -2989,7 +2087,7 @@ var keys = Object.keys;
 
 module.exports = function (object) { return keys(isValue(object) ? Object(object) : object); };
 
-},{"../is-value":25}],29:[function(require,module,exports){
+},{"../is-value":20}],24:[function(require,module,exports){
 "use strict";
 
 var isValue = require("./is-value");
@@ -3011,7 +2109,7 @@ module.exports = function (opts1/*, …options*/) {
 	return result;
 };
 
-},{"./is-value":25}],30:[function(require,module,exports){
+},{"./is-value":20}],25:[function(require,module,exports){
 "use strict";
 
 module.exports = function (fn) {
@@ -3019,7 +2117,7 @@ module.exports = function (fn) {
 	return fn;
 };
 
-},{}],31:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 "use strict";
 
 var isValue = require("./is-value");
@@ -3029,12 +2127,12 @@ module.exports = function (value) {
 	return value;
 };
 
-},{"./is-value":25}],32:[function(require,module,exports){
+},{"./is-value":20}],27:[function(require,module,exports){
 "use strict";
 
 module.exports = require("./is-implemented")() ? String.prototype.contains : require("./shim");
 
-},{"./is-implemented":33,"./shim":34}],33:[function(require,module,exports){
+},{"./is-implemented":28,"./shim":29}],28:[function(require,module,exports){
 "use strict";
 
 var str = "razdwatrzy";
@@ -3044,7 +2142,7 @@ module.exports = function () {
 	return str.contains("dwa") === true && str.contains("foo") === false;
 };
 
-},{}],34:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 "use strict";
 
 var indexOf = String.prototype.indexOf;
@@ -3053,15 +2151,15 @@ module.exports = function (searchString/*, position*/) {
 	return indexOf.call(this, searchString, arguments[1]) > -1;
 };
 
-},{}],35:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 module.exports = require('./lib/hypertimer');
 
-},{"./lib/hypertimer":38}],36:[function(require,module,exports){
+},{"./lib/hypertimer":33}],31:[function(require,module,exports){
 module.exports = (typeof window === 'undefined' || typeof window.Promise === 'undefined') ?
     require('promise') :
     window.Promise;
 
-},{"promise":52}],37:[function(require,module,exports){
+},{"promise":47}],32:[function(require,module,exports){
 var Debug = typeof window !== 'undefined' ? window.Debug : require('debug');
 
 module.exports = Debug || function () {
@@ -3069,7 +2167,7 @@ module.exports = Debug || function () {
   return function () {};
 };
 
-},{"debug":47}],38:[function(require,module,exports){
+},{"debug":42}],33:[function(require,module,exports){
 var emitter = require('event-emitter');
 var hasListeners = require('event-emitter/has-listeners');
 var createMaster = require('./synchronization/master').createMaster;
@@ -3772,12 +2870,12 @@ function hypertimer(options) {
 
 module.exports = hypertimer;
 
-},{"./synchronization/master":40,"./synchronization/slave":41,"./util":45,"event-emitter":50,"event-emitter/has-listeners":49}],39:[function(require,module,exports){
+},{"./synchronization/master":35,"./synchronization/slave":36,"./util":40,"event-emitter":45,"event-emitter/has-listeners":44}],34:[function(require,module,exports){
 module.exports = (typeof window === 'undefined' || typeof window.WebSocket === 'undefined') ?
     require('ws') :
     window.WebSocket;
 
-},{"ws":69}],40:[function(require,module,exports){
+},{"ws":69}],35:[function(require,module,exports){
 var WebSocket = require('./WebSocket');
 var emitter = require('./socket-emitter');
 var debug = require('../debug')('hypertimer:master');
@@ -3834,7 +2932,7 @@ exports.createMaster = function (now, config, port) {
   return master;
 };
 
-},{"../debug":37,"./WebSocket":39,"./socket-emitter":42}],41:[function(require,module,exports){
+},{"../debug":32,"./WebSocket":34,"./socket-emitter":37}],36:[function(require,module,exports){
 var WebSocket = require('./WebSocket');
 var Promise = require('../Promise');
 var debug = require('../debug')('hypertimer:slave');
@@ -3959,7 +3057,7 @@ exports.createSlave = function (url) {
 };
 
 
-},{"../Promise":36,"../debug":37,"./WebSocket":39,"./socket-emitter":42,"./stat":43,"./util":44}],42:[function(require,module,exports){
+},{"../Promise":31,"../debug":32,"./WebSocket":34,"./socket-emitter":37,"./stat":38,"./util":39}],37:[function(require,module,exports){
 // Turn a WebSocket in an event emitter.
 var eventEmitter = require('event-emitter');
 var Promise = require('./../Promise');
@@ -4071,7 +3169,7 @@ module.exports = function (socket) {
   return emitter;
 };
 
-},{"../debug":37,"./../Promise":36,"event-emitter":50}],43:[function(require,module,exports){
+},{"../debug":32,"./../Promise":31,"event-emitter":45}],38:[function(require,module,exports){
 // basic statistical functions
 
 exports.compare = function (a, b) {
@@ -4119,7 +3217,7 @@ exports.median = function (arr) {
   }
 };
 
-},{}],44:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 var Promise = require('../Promise');
 
 /**
@@ -4184,7 +3282,7 @@ exports.whilst = function (condition, callback) {
   });
 };
 
-},{"../Promise":36}],45:[function(require,module,exports){
+},{"../Promise":31}],40:[function(require,module,exports){
 
 /* istanbul ignore else */
 if (typeof Date.now === 'function') {
@@ -4220,7 +3318,7 @@ exports.shuffle = function (o){
   return o;
 };
 
-},{}],46:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 'use strict';
 
 var assign        = require('es5-ext/object/assign')
@@ -4285,7 +3383,7 @@ d.gs = function (dscr, get, set/*, options*/) {
 	return !options ? desc : assign(normalizeOpts(options), desc);
 };
 
-},{"es5-ext/object/assign":20,"es5-ext/object/is-callable":23,"es5-ext/object/normalize-options":29,"es5-ext/string/#/contains":32}],47:[function(require,module,exports){
+},{"es5-ext/object/assign":15,"es5-ext/object/is-callable":18,"es5-ext/object/normalize-options":24,"es5-ext/string/#/contains":27}],42:[function(require,module,exports){
 (function (process){
 /* eslint-env browser */
 
@@ -4553,7 +3651,7 @@ formatters.j = function (v) {
 };
 
 }).call(this,require('_process'))
-},{"./common":48,"_process":1}],48:[function(require,module,exports){
+},{"./common":43,"_process":54}],43:[function(require,module,exports){
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -4821,7 +3919,7 @@ function setup(env) {
 
 module.exports = setup;
 
-},{"ms":51}],49:[function(require,module,exports){
+},{"ms":46}],44:[function(require,module,exports){
 'use strict';
 
 var isEmpty = require('es5-ext/object/is-empty')
@@ -4839,7 +3937,7 @@ module.exports = function (obj/*, type*/) {
 	return obj.hasOwnProperty('__ee__') && !isEmpty(obj.__ee__);
 };
 
-},{"es5-ext/object/is-empty":24,"es5-ext/object/valid-value":31}],50:[function(require,module,exports){
+},{"es5-ext/object/is-empty":19,"es5-ext/object/valid-value":26}],45:[function(require,module,exports){
 'use strict';
 
 var d        = require('d')
@@ -4973,7 +4071,7 @@ module.exports = exports = function (o) {
 };
 exports.methods = methods;
 
-},{"d":46,"es5-ext/object/valid-callable":30}],51:[function(require,module,exports){
+},{"d":41,"es5-ext/object/valid-callable":25}],46:[function(require,module,exports){
 /**
  * Helpers.
  */
@@ -5137,12 +4235,12 @@ function plural(ms, msAbs, n, name) {
   return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
 }
 
-},{}],52:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./lib')
 
-},{"./lib":57}],53:[function(require,module,exports){
+},{"./lib":52}],48:[function(require,module,exports){
 'use strict';
 
 var asap = require('asap/raw');
@@ -5328,7 +4426,7 @@ function doResolve(fn, promise) {
   }
 }
 
-},{"asap/raw":18}],54:[function(require,module,exports){
+},{"asap/raw":11}],49:[function(require,module,exports){
 'use strict';
 
 var Promise = require('./core.js');
@@ -5343,7 +4441,7 @@ Promise.prototype.done = function (onFulfilled, onRejected) {
   });
 };
 
-},{"./core.js":53}],55:[function(require,module,exports){
+},{"./core.js":48}],50:[function(require,module,exports){
 'use strict';
 
 //This file contains the ES6 extensions to the core Promises/A+ API
@@ -5452,7 +4550,7 @@ Promise.prototype['catch'] = function (onRejected) {
   return this.then(null, onRejected);
 };
 
-},{"./core.js":53}],56:[function(require,module,exports){
+},{"./core.js":48}],51:[function(require,module,exports){
 'use strict';
 
 var Promise = require('./core.js');
@@ -5470,7 +4568,7 @@ Promise.prototype['finally'] = function (f) {
   });
 };
 
-},{"./core.js":53}],57:[function(require,module,exports){
+},{"./core.js":48}],52:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./core.js');
@@ -5479,7 +4577,7 @@ require('./finally.js');
 require('./es6-extensions.js');
 require('./node-extensions.js');
 
-},{"./core.js":53,"./done.js":54,"./es6-extensions.js":55,"./finally.js":56,"./node-extensions.js":58}],58:[function(require,module,exports){
+},{"./core.js":48,"./done.js":49,"./es6-extensions.js":50,"./finally.js":51,"./node-extensions.js":53}],53:[function(require,module,exports){
 'use strict';
 
 // This file contains then/promise specific extensions that are only useful
@@ -5552,9 +4650,195 @@ Promise.prototype.nodeify = function (callback, ctx) {
   });
 }
 
-},{"./core.js":53,"asap":17}],59:[function(require,module,exports){
-arguments[4][52][0].apply(exports,arguments)
-},{"./lib":64,"dup":52}],60:[function(require,module,exports){
+},{"./core.js":48,"asap":10}],54:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],55:[function(require,module,exports){
+arguments[4][47][0].apply(exports,arguments)
+},{"./lib":60,"dup":47}],56:[function(require,module,exports){
 'use strict';
 
 var asap = require('asap/raw');
@@ -5769,9 +5053,9 @@ function doResolve(fn, promise) {
   }
 }
 
-},{"asap/raw":18}],61:[function(require,module,exports){
-arguments[4][54][0].apply(exports,arguments)
-},{"./core.js":60,"dup":54}],62:[function(require,module,exports){
+},{"asap/raw":11}],57:[function(require,module,exports){
+arguments[4][49][0].apply(exports,arguments)
+},{"./core.js":56,"dup":49}],58:[function(require,module,exports){
 'use strict';
 
 //This file contains the ES6 extensions to the core Promises/A+ API
@@ -5880,9 +5164,9 @@ Promise.prototype['catch'] = function (onRejected) {
   return this.then(null, onRejected);
 };
 
-},{"./core.js":60}],63:[function(require,module,exports){
-arguments[4][56][0].apply(exports,arguments)
-},{"./core.js":60,"dup":56}],64:[function(require,module,exports){
+},{"./core.js":56}],59:[function(require,module,exports){
+arguments[4][51][0].apply(exports,arguments)
+},{"./core.js":56,"dup":51}],60:[function(require,module,exports){
 'use strict';
 
 module.exports = require('./core.js');
@@ -5892,7 +5176,7 @@ require('./es6-extensions.js');
 require('./node-extensions.js');
 require('./synchronous.js');
 
-},{"./core.js":60,"./done.js":61,"./es6-extensions.js":62,"./finally.js":63,"./node-extensions.js":65,"./synchronous.js":66}],65:[function(require,module,exports){
+},{"./core.js":56,"./done.js":57,"./es6-extensions.js":58,"./finally.js":59,"./node-extensions.js":61,"./synchronous.js":62}],61:[function(require,module,exports){
 'use strict';
 
 // This file contains then/promise specific extensions that are only useful
@@ -6024,7 +5308,7 @@ Promise.prototype.nodeify = function (callback, ctx) {
   });
 }
 
-},{"./core.js":60,"asap":17}],66:[function(require,module,exports){
+},{"./core.js":56,"asap":10}],62:[function(require,module,exports){
 'use strict';
 
 var Promise = require('./core.js');
@@ -6088,7 +5372,723 @@ Promise.disableSynchronous = function() {
   Promise.prototype.getState = undefined;
 };
 
-},{"./core.js":60}],67:[function(require,module,exports){
+},{"./core.js":56}],63:[function(require,module,exports){
+(function (global){
+/*! https://mths.be/punycode v1.4.1 by @mathias */
+;(function(root) {
+
+	/** Detect free variables */
+	var freeExports = typeof exports == 'object' && exports &&
+		!exports.nodeType && exports;
+	var freeModule = typeof module == 'object' && module &&
+		!module.nodeType && module;
+	var freeGlobal = typeof global == 'object' && global;
+	if (
+		freeGlobal.global === freeGlobal ||
+		freeGlobal.window === freeGlobal ||
+		freeGlobal.self === freeGlobal
+	) {
+		root = freeGlobal;
+	}
+
+	/**
+	 * The `punycode` object.
+	 * @name punycode
+	 * @type Object
+	 */
+	var punycode,
+
+	/** Highest positive signed 32-bit float value */
+	maxInt = 2147483647, // aka. 0x7FFFFFFF or 2^31-1
+
+	/** Bootstring parameters */
+	base = 36,
+	tMin = 1,
+	tMax = 26,
+	skew = 38,
+	damp = 700,
+	initialBias = 72,
+	initialN = 128, // 0x80
+	delimiter = '-', // '\x2D'
+
+	/** Regular expressions */
+	regexPunycode = /^xn--/,
+	regexNonASCII = /[^\x20-\x7E]/, // unprintable ASCII chars + non-ASCII chars
+	regexSeparators = /[\x2E\u3002\uFF0E\uFF61]/g, // RFC 3490 separators
+
+	/** Error messages */
+	errors = {
+		'overflow': 'Overflow: input needs wider integers to process',
+		'not-basic': 'Illegal input >= 0x80 (not a basic code point)',
+		'invalid-input': 'Invalid input'
+	},
+
+	/** Convenience shortcuts */
+	baseMinusTMin = base - tMin,
+	floor = Math.floor,
+	stringFromCharCode = String.fromCharCode,
+
+	/** Temporary variable */
+	key;
+
+	/*--------------------------------------------------------------------------*/
+
+	/**
+	 * A generic error utility function.
+	 * @private
+	 * @param {String} type The error type.
+	 * @returns {Error} Throws a `RangeError` with the applicable error message.
+	 */
+	function error(type) {
+		throw new RangeError(errors[type]);
+	}
+
+	/**
+	 * A generic `Array#map` utility function.
+	 * @private
+	 * @param {Array} array The array to iterate over.
+	 * @param {Function} callback The function that gets called for every array
+	 * item.
+	 * @returns {Array} A new array of values returned by the callback function.
+	 */
+	function map(array, fn) {
+		var length = array.length;
+		var result = [];
+		while (length--) {
+			result[length] = fn(array[length]);
+		}
+		return result;
+	}
+
+	/**
+	 * A simple `Array#map`-like wrapper to work with domain name strings or email
+	 * addresses.
+	 * @private
+	 * @param {String} domain The domain name or email address.
+	 * @param {Function} callback The function that gets called for every
+	 * character.
+	 * @returns {Array} A new string of characters returned by the callback
+	 * function.
+	 */
+	function mapDomain(string, fn) {
+		var parts = string.split('@');
+		var result = '';
+		if (parts.length > 1) {
+			// In email addresses, only the domain name should be punycoded. Leave
+			// the local part (i.e. everything up to `@`) intact.
+			result = parts[0] + '@';
+			string = parts[1];
+		}
+		// Avoid `split(regex)` for IE8 compatibility. See #17.
+		string = string.replace(regexSeparators, '\x2E');
+		var labels = string.split('.');
+		var encoded = map(labels, fn).join('.');
+		return result + encoded;
+	}
+
+	/**
+	 * Creates an array containing the numeric code points of each Unicode
+	 * character in the string. While JavaScript uses UCS-2 internally,
+	 * this function will convert a pair of surrogate halves (each of which
+	 * UCS-2 exposes as separate characters) into a single code point,
+	 * matching UTF-16.
+	 * @see `punycode.ucs2.encode`
+	 * @see <https://mathiasbynens.be/notes/javascript-encoding>
+	 * @memberOf punycode.ucs2
+	 * @name decode
+	 * @param {String} string The Unicode input string (UCS-2).
+	 * @returns {Array} The new array of code points.
+	 */
+	function ucs2decode(string) {
+		var output = [],
+		    counter = 0,
+		    length = string.length,
+		    value,
+		    extra;
+		while (counter < length) {
+			value = string.charCodeAt(counter++);
+			if (value >= 0xD800 && value <= 0xDBFF && counter < length) {
+				// high surrogate, and there is a next character
+				extra = string.charCodeAt(counter++);
+				if ((extra & 0xFC00) == 0xDC00) { // low surrogate
+					output.push(((value & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000);
+				} else {
+					// unmatched surrogate; only append this code unit, in case the next
+					// code unit is the high surrogate of a surrogate pair
+					output.push(value);
+					counter--;
+				}
+			} else {
+				output.push(value);
+			}
+		}
+		return output;
+	}
+
+	/**
+	 * Creates a string based on an array of numeric code points.
+	 * @see `punycode.ucs2.decode`
+	 * @memberOf punycode.ucs2
+	 * @name encode
+	 * @param {Array} codePoints The array of numeric code points.
+	 * @returns {String} The new Unicode string (UCS-2).
+	 */
+	function ucs2encode(array) {
+		return map(array, function(value) {
+			var output = '';
+			if (value > 0xFFFF) {
+				value -= 0x10000;
+				output += stringFromCharCode(value >>> 10 & 0x3FF | 0xD800);
+				value = 0xDC00 | value & 0x3FF;
+			}
+			output += stringFromCharCode(value);
+			return output;
+		}).join('');
+	}
+
+	/**
+	 * Converts a basic code point into a digit/integer.
+	 * @see `digitToBasic()`
+	 * @private
+	 * @param {Number} codePoint The basic numeric code point value.
+	 * @returns {Number} The numeric value of a basic code point (for use in
+	 * representing integers) in the range `0` to `base - 1`, or `base` if
+	 * the code point does not represent a value.
+	 */
+	function basicToDigit(codePoint) {
+		if (codePoint - 48 < 10) {
+			return codePoint - 22;
+		}
+		if (codePoint - 65 < 26) {
+			return codePoint - 65;
+		}
+		if (codePoint - 97 < 26) {
+			return codePoint - 97;
+		}
+		return base;
+	}
+
+	/**
+	 * Converts a digit/integer into a basic code point.
+	 * @see `basicToDigit()`
+	 * @private
+	 * @param {Number} digit The numeric value of a basic code point.
+	 * @returns {Number} The basic code point whose value (when used for
+	 * representing integers) is `digit`, which needs to be in the range
+	 * `0` to `base - 1`. If `flag` is non-zero, the uppercase form is
+	 * used; else, the lowercase form is used. The behavior is undefined
+	 * if `flag` is non-zero and `digit` has no uppercase form.
+	 */
+	function digitToBasic(digit, flag) {
+		//  0..25 map to ASCII a..z or A..Z
+		// 26..35 map to ASCII 0..9
+		return digit + 22 + 75 * (digit < 26) - ((flag != 0) << 5);
+	}
+
+	/**
+	 * Bias adaptation function as per section 3.4 of RFC 3492.
+	 * https://tools.ietf.org/html/rfc3492#section-3.4
+	 * @private
+	 */
+	function adapt(delta, numPoints, firstTime) {
+		var k = 0;
+		delta = firstTime ? floor(delta / damp) : delta >> 1;
+		delta += floor(delta / numPoints);
+		for (/* no initialization */; delta > baseMinusTMin * tMax >> 1; k += base) {
+			delta = floor(delta / baseMinusTMin);
+		}
+		return floor(k + (baseMinusTMin + 1) * delta / (delta + skew));
+	}
+
+	/**
+	 * Converts a Punycode string of ASCII-only symbols to a string of Unicode
+	 * symbols.
+	 * @memberOf punycode
+	 * @param {String} input The Punycode string of ASCII-only symbols.
+	 * @returns {String} The resulting string of Unicode symbols.
+	 */
+	function decode(input) {
+		// Don't use UCS-2
+		var output = [],
+		    inputLength = input.length,
+		    out,
+		    i = 0,
+		    n = initialN,
+		    bias = initialBias,
+		    basic,
+		    j,
+		    index,
+		    oldi,
+		    w,
+		    k,
+		    digit,
+		    t,
+		    /** Cached calculation results */
+		    baseMinusT;
+
+		// Handle the basic code points: let `basic` be the number of input code
+		// points before the last delimiter, or `0` if there is none, then copy
+		// the first basic code points to the output.
+
+		basic = input.lastIndexOf(delimiter);
+		if (basic < 0) {
+			basic = 0;
+		}
+
+		for (j = 0; j < basic; ++j) {
+			// if it's not a basic code point
+			if (input.charCodeAt(j) >= 0x80) {
+				error('not-basic');
+			}
+			output.push(input.charCodeAt(j));
+		}
+
+		// Main decoding loop: start just after the last delimiter if any basic code
+		// points were copied; start at the beginning otherwise.
+
+		for (index = basic > 0 ? basic + 1 : 0; index < inputLength; /* no final expression */) {
+
+			// `index` is the index of the next character to be consumed.
+			// Decode a generalized variable-length integer into `delta`,
+			// which gets added to `i`. The overflow checking is easier
+			// if we increase `i` as we go, then subtract off its starting
+			// value at the end to obtain `delta`.
+			for (oldi = i, w = 1, k = base; /* no condition */; k += base) {
+
+				if (index >= inputLength) {
+					error('invalid-input');
+				}
+
+				digit = basicToDigit(input.charCodeAt(index++));
+
+				if (digit >= base || digit > floor((maxInt - i) / w)) {
+					error('overflow');
+				}
+
+				i += digit * w;
+				t = k <= bias ? tMin : (k >= bias + tMax ? tMax : k - bias);
+
+				if (digit < t) {
+					break;
+				}
+
+				baseMinusT = base - t;
+				if (w > floor(maxInt / baseMinusT)) {
+					error('overflow');
+				}
+
+				w *= baseMinusT;
+
+			}
+
+			out = output.length + 1;
+			bias = adapt(i - oldi, out, oldi == 0);
+
+			// `i` was supposed to wrap around from `out` to `0`,
+			// incrementing `n` each time, so we'll fix that now:
+			if (floor(i / out) > maxInt - n) {
+				error('overflow');
+			}
+
+			n += floor(i / out);
+			i %= out;
+
+			// Insert `n` at position `i` of the output
+			output.splice(i++, 0, n);
+
+		}
+
+		return ucs2encode(output);
+	}
+
+	/**
+	 * Converts a string of Unicode symbols (e.g. a domain name label) to a
+	 * Punycode string of ASCII-only symbols.
+	 * @memberOf punycode
+	 * @param {String} input The string of Unicode symbols.
+	 * @returns {String} The resulting Punycode string of ASCII-only symbols.
+	 */
+	function encode(input) {
+		var n,
+		    delta,
+		    handledCPCount,
+		    basicLength,
+		    bias,
+		    j,
+		    m,
+		    q,
+		    k,
+		    t,
+		    currentValue,
+		    output = [],
+		    /** `inputLength` will hold the number of code points in `input`. */
+		    inputLength,
+		    /** Cached calculation results */
+		    handledCPCountPlusOne,
+		    baseMinusT,
+		    qMinusT;
+
+		// Convert the input in UCS-2 to Unicode
+		input = ucs2decode(input);
+
+		// Cache the length
+		inputLength = input.length;
+
+		// Initialize the state
+		n = initialN;
+		delta = 0;
+		bias = initialBias;
+
+		// Handle the basic code points
+		for (j = 0; j < inputLength; ++j) {
+			currentValue = input[j];
+			if (currentValue < 0x80) {
+				output.push(stringFromCharCode(currentValue));
+			}
+		}
+
+		handledCPCount = basicLength = output.length;
+
+		// `handledCPCount` is the number of code points that have been handled;
+		// `basicLength` is the number of basic code points.
+
+		// Finish the basic string - if it is not empty - with a delimiter
+		if (basicLength) {
+			output.push(delimiter);
+		}
+
+		// Main encoding loop:
+		while (handledCPCount < inputLength) {
+
+			// All non-basic code points < n have been handled already. Find the next
+			// larger one:
+			for (m = maxInt, j = 0; j < inputLength; ++j) {
+				currentValue = input[j];
+				if (currentValue >= n && currentValue < m) {
+					m = currentValue;
+				}
+			}
+
+			// Increase `delta` enough to advance the decoder's <n,i> state to <m,0>,
+			// but guard against overflow
+			handledCPCountPlusOne = handledCPCount + 1;
+			if (m - n > floor((maxInt - delta) / handledCPCountPlusOne)) {
+				error('overflow');
+			}
+
+			delta += (m - n) * handledCPCountPlusOne;
+			n = m;
+
+			for (j = 0; j < inputLength; ++j) {
+				currentValue = input[j];
+
+				if (currentValue < n && ++delta > maxInt) {
+					error('overflow');
+				}
+
+				if (currentValue == n) {
+					// Represent delta as a generalized variable-length integer
+					for (q = delta, k = base; /* no condition */; k += base) {
+						t = k <= bias ? tMin : (k >= bias + tMax ? tMax : k - bias);
+						if (q < t) {
+							break;
+						}
+						qMinusT = q - t;
+						baseMinusT = base - t;
+						output.push(
+							stringFromCharCode(digitToBasic(t + qMinusT % baseMinusT, 0))
+						);
+						q = floor(qMinusT / baseMinusT);
+					}
+
+					output.push(stringFromCharCode(digitToBasic(q, 0)));
+					bias = adapt(delta, handledCPCountPlusOne, handledCPCount == basicLength);
+					delta = 0;
+					++handledCPCount;
+				}
+			}
+
+			++delta;
+			++n;
+
+		}
+		return output.join('');
+	}
+
+	/**
+	 * Converts a Punycode string representing a domain name or an email address
+	 * to Unicode. Only the Punycoded parts of the input will be converted, i.e.
+	 * it doesn't matter if you call it on a string that has already been
+	 * converted to Unicode.
+	 * @memberOf punycode
+	 * @param {String} input The Punycoded domain name or email address to
+	 * convert to Unicode.
+	 * @returns {String} The Unicode representation of the given Punycode
+	 * string.
+	 */
+	function toUnicode(input) {
+		return mapDomain(input, function(string) {
+			return regexPunycode.test(string)
+				? decode(string.slice(4).toLowerCase())
+				: string;
+		});
+	}
+
+	/**
+	 * Converts a Unicode string representing a domain name or an email address to
+	 * Punycode. Only the non-ASCII parts of the domain name will be converted,
+	 * i.e. it doesn't matter if you call it with a domain that's already in
+	 * ASCII.
+	 * @memberOf punycode
+	 * @param {String} input The domain name or email address to convert, as a
+	 * Unicode string.
+	 * @returns {String} The Punycode representation of the given domain name or
+	 * email address.
+	 */
+	function toASCII(input) {
+		return mapDomain(input, function(string) {
+			return regexNonASCII.test(string)
+				? 'xn--' + encode(string)
+				: string;
+		});
+	}
+
+	/*--------------------------------------------------------------------------*/
+
+	/** Define the public API */
+	punycode = {
+		/**
+		 * A string representing the current Punycode.js version number.
+		 * @memberOf punycode
+		 * @type String
+		 */
+		'version': '1.4.1',
+		/**
+		 * An object of methods to convert from JavaScript's internal character
+		 * representation (UCS-2) to Unicode code points, and back.
+		 * @see <https://mathiasbynens.be/notes/javascript-encoding>
+		 * @memberOf punycode
+		 * @type Object
+		 */
+		'ucs2': {
+			'decode': ucs2decode,
+			'encode': ucs2encode
+		},
+		'decode': decode,
+		'encode': encode,
+		'toASCII': toASCII,
+		'toUnicode': toUnicode
+	};
+
+	/** Expose `punycode` */
+	// Some AMD build optimizers, like r.js, check for specific condition patterns
+	// like the following:
+	if (
+		typeof define == 'function' &&
+		typeof define.amd == 'object' &&
+		define.amd
+	) {
+		define('punycode', function() {
+			return punycode;
+		});
+	} else if (freeExports && freeModule) {
+		if (module.exports == freeExports) {
+			// in Node.js, io.js, or RingoJS v0.8.0+
+			freeModule.exports = punycode;
+		} else {
+			// in Narwhal or RingoJS v0.7.0-
+			for (key in punycode) {
+				punycode.hasOwnProperty(key) && (freeExports[key] = punycode[key]);
+			}
+		}
+	} else {
+		// in Rhino or a web browser
+		root.punycode = punycode;
+	}
+
+}(this));
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],64:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+'use strict';
+
+// If obj.hasOwnProperty has been overridden, then calling
+// obj.hasOwnProperty(prop) will break.
+// See: https://github.com/joyent/node/issues/1707
+function hasOwnProperty(obj, prop) {
+  return Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+module.exports = function(qs, sep, eq, options) {
+  sep = sep || '&';
+  eq = eq || '=';
+  var obj = {};
+
+  if (typeof qs !== 'string' || qs.length === 0) {
+    return obj;
+  }
+
+  var regexp = /\+/g;
+  qs = qs.split(sep);
+
+  var maxKeys = 1000;
+  if (options && typeof options.maxKeys === 'number') {
+    maxKeys = options.maxKeys;
+  }
+
+  var len = qs.length;
+  // maxKeys <= 0 means that we should not limit keys count
+  if (maxKeys > 0 && len > maxKeys) {
+    len = maxKeys;
+  }
+
+  for (var i = 0; i < len; ++i) {
+    var x = qs[i].replace(regexp, '%20'),
+        idx = x.indexOf(eq),
+        kstr, vstr, k, v;
+
+    if (idx >= 0) {
+      kstr = x.substr(0, idx);
+      vstr = x.substr(idx + 1);
+    } else {
+      kstr = x;
+      vstr = '';
+    }
+
+    k = decodeURIComponent(kstr);
+    v = decodeURIComponent(vstr);
+
+    if (!hasOwnProperty(obj, k)) {
+      obj[k] = v;
+    } else if (isArray(obj[k])) {
+      obj[k].push(v);
+    } else {
+      obj[k] = [obj[k], v];
+    }
+  }
+
+  return obj;
+};
+
+var isArray = Array.isArray || function (xs) {
+  return Object.prototype.toString.call(xs) === '[object Array]';
+};
+
+},{}],65:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+'use strict';
+
+var stringifyPrimitive = function(v) {
+  switch (typeof v) {
+    case 'string':
+      return v;
+
+    case 'boolean':
+      return v ? 'true' : 'false';
+
+    case 'number':
+      return isFinite(v) ? v : '';
+
+    default:
+      return '';
+  }
+};
+
+module.exports = function(obj, sep, eq, name) {
+  sep = sep || '&';
+  eq = eq || '=';
+  if (obj === null) {
+    obj = undefined;
+  }
+
+  if (typeof obj === 'object') {
+    return map(objectKeys(obj), function(k) {
+      var ks = encodeURIComponent(stringifyPrimitive(k)) + eq;
+      if (isArray(obj[k])) {
+        return map(obj[k], function(v) {
+          return ks + encodeURIComponent(stringifyPrimitive(v));
+        }).join(sep);
+      } else {
+        return ks + encodeURIComponent(stringifyPrimitive(obj[k]));
+      }
+    }).join(sep);
+
+  }
+
+  if (!name) return '';
+  return encodeURIComponent(stringifyPrimitive(name)) + eq +
+         encodeURIComponent(stringifyPrimitive(obj));
+};
+
+var isArray = Array.isArray || function (xs) {
+  return Object.prototype.toString.call(xs) === '[object Array]';
+};
+
+function map (xs, f) {
+  if (xs.map) return xs.map(f);
+  var res = [];
+  for (var i = 0; i < xs.length; i++) {
+    res.push(f(xs[i], i));
+  }
+  return res;
+}
+
+var objectKeys = Object.keys || function (obj) {
+  var res = [];
+  for (var key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) res.push(key);
+  }
+  return res;
+};
+
+},{}],66:[function(require,module,exports){
+'use strict';
+
+exports.decode = exports.parse = require('./decode');
+exports.encode = exports.stringify = require('./encode');
+
+},{"./decode":64,"./encode":65}],67:[function(require,module,exports){
 (function (global){
 'use strict';
 
@@ -6305,5 +6305,5 @@ module.exports = function() {
   );
 };
 
-},{}]},{},[8])(8)
+},{}]},{},[1])(1)
 });

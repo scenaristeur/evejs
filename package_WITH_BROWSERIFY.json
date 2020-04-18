@@ -1,6 +1,6 @@
 {
   "name": "evejs",
-  "version": "0.6.0-SNAPSHOT",
+  "version": "0.6.1",
   "description": "Simple message based agents.",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
   "keywords": [
@@ -48,7 +48,7 @@
     "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
-     "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve",
+    "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve",
     "build": "gulp",
     "watch": "gulp watch",
     "watch-dev": "gulp watch-dev",
