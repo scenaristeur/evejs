@@ -44,7 +44,7 @@
     "uglify-js": "2.6.1",
     "vinyl-buffer": "^1.0.1",
     "vinyl-source-stream": "^2.0.0",
-    "webpack": "1.12.13",
+    "webpack": "^4.31.0",
     "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
