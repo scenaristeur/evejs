@@ -1,8 +1,8 @@
 {
   "name": "evejs",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Simple message based agents.",
-  "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
+  "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong) Update deps by https://github.com/scenaristeur",
   "keywords": [
     "eve",
     "agent",
@@ -11,7 +11,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/enmasseio/evejs.git"
+    "url": "git://github.com/scenaristeur/evejs.git"
   },
   "dependencies": {
     "amqplib": "0.5.1",
@@ -48,6 +48,7 @@
     "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
+    "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve",
     "build": "gulp",
     "watch": "gulp watch",
     "watch-dev": "gulp watch-dev",
