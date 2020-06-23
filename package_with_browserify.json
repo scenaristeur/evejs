@@ -48,7 +48,7 @@
     "webpack2-stream-watch": "^3.2.2"
   },
   "scripts": {
-    "install": "npx browserify custom.js -o dist/eve.custom.js -s eve",
+    "install": "npm install -g browserify && browserify custom.js -o dist/eve.custom.js -s eve",
     "build": "gulp",
     "watch": "gulp watch",
     "watch-dev": "gulp watch-dev",
