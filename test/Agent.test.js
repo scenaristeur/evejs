@@ -187,7 +187,7 @@ describe('Agent', function() {
       agent2.send('agent3@local2', 'hello');
     });
 
-    it('should send a message with protocol://networkId/agentId notation', function (done) {
+    it.skip('should send a message with protocol://networkId/agentId notation', function (done) {
       var transport1 = new LocalTransport({id: 'local1'});
       var transport2 = new DistribusTransport({networkId: 'distribus1'});
 
