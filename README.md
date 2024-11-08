@@ -9,11 +9,16 @@
 
 # HISTORY and ISSUES 
  ## first install 
-  - nanomsg https://www.npmjs.com/package/nanomsg does not install, https://nanomsg.org/
+  - nanomsg https://www.npmjs.com/package/nanomsg does not install with nodejs >= 20 but install ok with `nvm use 16`, https://nanomsg.org/
   -> resolution : removed     "nanomsg": "^4.1.0", from package.json
   -> npm run test is ok but not examples
   -> try with `    "nanomsg": "github:zboszor/node-nanomsg",` in package.json according to https://github.com/nickdesaulniers/node-nanomsg/pull/238 not merged yet
   -> Could be migrate to nanomsgNextGeneration ? https://nanomsg.org/ actively maintained
+  -> commented in index.js
+
+## run example basicUsage.js
+- use Codeium with " transforme en es6, tranforme les require en import "
+
 
 # Build a minimal browser version in dist/eve.custom.js
 ```

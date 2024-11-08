@@ -3,6 +3,7 @@
   "version": "0.6.1",
   "description": "Simple message based agents.",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
+  "type": "module",
   "keywords": [
     "eve",
     "agent",
@@ -60,7 +61,8 @@
     "minify": "gulp minify",
     "compress": "gulp compress",
     "watch-compress": "gulp watch",
-    "test": "mocha test --recursive --reporter spec"
+    "test": "mocha test --recursive --reporter spec",
+    "test_es6": "mocha test_es6 --recursive --reporter spec"
   },
   "main": "./index.js"
 }
