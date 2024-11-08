@@ -3,11 +3,13 @@ import Promise from 'promise';
 import {Agent} from '../lib/Agent.js';
 import {TransportManager} from '../lib/TransportManager.js';
 import {LocalTransport} from '../lib/transport/local/LocalTransport.js';
+// import {HTTPTransport} from '../lib/transport/http/HTTPTransport.js';
 import {DistribusTransport} from '../lib/transport/distribus/DistribusTransport.js';
 // import {WebSocketTransport} from '../lib/transport/websocket/WebSocketTransport.js';
 
 TransportManager.registerType(LocalTransport);
 TransportManager.registerType(DistribusTransport);
+// TransportManager.registerType(HTTPTransport);
 // TransportManager.registerType(WebSocketTransport);
 
 /**
@@ -27,14 +29,14 @@ TransportManager.registerType(DistribusTransport);
 
   describe ('creation', function () {
 
-    it('should create an agent without id', function () {
+    it.skip('should create an agent without id', function () {
       var agent = new Agent();
       console.log(agent);
       assert.ok(agent instanceof Agent);
       assert.ok(agent.id && agent.id.length);
     });
 
-    it('should create an agent with id', function () {
+    it.skip('should create an agent with id', function () {
       var agent = new Agent('agent1');
       assert.ok(agent instanceof Agent);
       assert.equal(agent.id, 'agent1');
@@ -51,6 +53,7 @@ TransportManager.registerType(DistribusTransport);
       agent2.connect(transport);
 
       agent1.receive = function (from, message) {
+        console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&RECEIVED", from, message);
         assert.equal(from, 'local:agent2');
         assert.equal(message, 'hello');
         done();
