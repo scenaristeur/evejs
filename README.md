@@ -1,3 +1,20 @@
+# FORK in ES of evejs
+- https://github.com/enmasseio/evejs
+- https://eve.almende.com/implementations/javascript/introduction.html
+
+# prerequisites
+- Linux Mint
+- node >= 20.10
+
+
+# HISTORY and ISSUES 
+ ## first install 
+  - nanomsg https://www.npmjs.com/package/nanomsg does not install, https://nanomsg.org/
+  -> resolution : removed     "nanomsg": "^4.1.0", from package.json
+  -> npm run test is ok but not examples
+  -> try with `    "nanomsg": "github:zboszor/node-nanomsg",` in package.json according to https://github.com/nickdesaulniers/node-nanomsg/pull/238 not merged yet
+  -> Could be migrate to nanomsgNextGeneration ? https://nanomsg.org/ actively maintained
+
 # Build a minimal browser version in dist/eve.custom.js
 ```
 npm install -g browserify
