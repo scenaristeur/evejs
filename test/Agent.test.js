@@ -1,10 +1,10 @@
-var assert = require('assert');
-var Promise = require('promise');
-var Agent = require('../lib/Agent');
-var TransportManager = require('../lib/TransportManager');
-var LocalTransport = require('../lib/transport/local/LocalTransport');
-var DistribusTransport = require('../lib/transport/distribus/DistribusTransport');
-var WebSocketTransport = require('../lib/transport/websocket/WebSocketTransport');
+import assert from 'assert';
+import Promise from 'promise';
+import {Agent} from '../lib/Agent.js';
+import {TransportManager} from '../lib/TransportManager.js';
+import {LocalTransport} from '../lib/transport/local/LocalTransport.js';
+import {DistribusTransport} from '../lib/transport/distribus/DistribusTransport.js';
+import {WebSocketTransport} from '../lib/transport/websocket/WebSocketTransport.js';
 
 TransportManager.registerType(LocalTransport);
 TransportManager.registerType(DistribusTransport);

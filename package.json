@@ -21,11 +21,10 @@
     "dbus-native": "^0.4.0",
     "distribus": "github:scenaristeur/distribus#develop",
     "hypertimer": "github:scenaristeur/hypertimer#develop",
-    "nanomsg": "github:zboszor/node-nanomsg",
     "promise": "^8.1.0",
     "pubnub": "^4.36.0",
     "seed-random": "^2.2.0",
-    "uuid-v4": "^0.1.0",
+    "uuid": "^11.0.2",
     "ws": "^8.3.0"
   },
   "devDependencies": {
